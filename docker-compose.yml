@@ -21,8 +21,8 @@ services:
       context: .
       target: web
     container_name: playlist-rotate-web
-    profiles: [ui]
     depends_on: [daemon]
     ports:
       - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8000}:80"
+    restart: unless-stopped
     logging: *logging

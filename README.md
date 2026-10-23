@@ -7,7 +7,7 @@ It runs as two containers:
 - **daemon:** runs 24/7. It owns the database, talks to Spotify, rotates playlists on schedule and serves the
   API. It publishes no port.
 - **web:** an nginx container serving the manager UI and forwarding `/api` to the daemon. Start it when you
-  want to change something and stop it afterwards. Scheduled rotations don't need it.
+  want to change something and stop it the rest of the time. Scheduled rotations don't need it.
 
 ## How it works
 
@@ -39,7 +39,7 @@ It runs as two containers:
 3. Start the daemon and the web manager:
 
    ```bash
-   docker compose --profile ui up -d --build
+   docker compose up -d --build
    ```
 
 4. Open <http://127.0.0.1:8000/settings>, click **Authorize with Spotify**, put the displayed
@@ -55,17 +55,21 @@ until you put a different token in `.env`.
 
 ## Daily use
 
-The daemon starts with `docker compose up -d` and comes back after a reboot. To use the manager:
-
-```bash
-docker compose --profile ui up -d web
-```
-
-When you're done:
+`docker compose up -d` creates and starts both containers. Both come back after a reboot, unless you stopped
+them. Stop the web manager when you don't need it; scheduled rotations keep running:
 
 ```bash
 docker compose stop web
 ```
+
+Start it again when you want to change something:
+
+```bash
+docker compose start web
+```
+
+Running `docker compose up -d` again (for example after an update) also starts the web manager, so stop it
+afterwards if you want it off.
 
 ## Deploying on a server
 
