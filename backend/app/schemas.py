@@ -40,7 +40,7 @@ class RuleOut(RuleIn):
     id: int
 
 
-class PlaylistIn(Schema):
+class PlaylistSettings(Schema):
     name: str = Field(min_length=1)
     spotify_target: str = Field(min_length=1)
     artists: str
@@ -55,6 +55,9 @@ class PlaylistIn(Schema):
     max_duration: int | None = Field(default=None, ge=1)
     solo_only: bool
     exclude_duplicates: bool
+
+
+class PlaylistIn(PlaylistSettings):
     disabled_rule_ids: list[int]
 
 
@@ -66,6 +69,14 @@ class PlaylistOut(PlaylistIn):
     next_rotation_at: UtcDatetime
     last_error: str | None
     rules: list[RuleOut]
+
+
+class PlaylistExport(Schema):
+    format: Literal["spotify-playlist-rotate"] = "spotify-playlist-rotate"
+    version: Literal[1] = 1
+    playlist: PlaylistSettings
+    rules: list[RuleIn]
+    disabled_global_rules: list[RuleIn]
 
 
 class PlaylistSummary(Schema):

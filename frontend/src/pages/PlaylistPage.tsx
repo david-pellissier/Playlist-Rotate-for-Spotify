@@ -65,6 +65,7 @@ export default function PlaylistPage() {
         </div>
         <div className="actions">
           <Link className="button" to={`/playlists/${id}/edit`}>Edit</Link>
+          <a className="button" href={api.exportUrl(id)} download>Export</a>
           <button disabled={working} onClick={refresh}>Refresh catalog</button>
           <button disabled={working} onClick={clearCooldowns}>Clear cooldowns</button>
           <button disabled={working} onClick={() => rotate(true)}>Dry run</button>

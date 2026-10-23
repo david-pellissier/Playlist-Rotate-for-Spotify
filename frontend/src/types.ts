@@ -120,6 +120,8 @@ export interface Progress {
   total: number;
 }
 
+export type ImportConflict = "fail" | "replace" | "copy";
+
 export interface AuthStatus {
   configured: boolean;
   authorize_url: string | null;

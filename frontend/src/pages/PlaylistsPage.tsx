@@ -1,11 +1,13 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import ImportPlaylist from "../components/ImportPlaylist";
 import { formatDate } from "../format";
 import { useAction, useLoader } from "../hooks";
 
 export default function PlaylistsPage() {
   const { data: playlists, error, reload } = useLoader(api.playlists, []);
   const action = useAction();
+  const navigate = useNavigate();
 
   async function remove(id: number, name: string) {
     if (!confirm(`Delete the configuration "${name}"? The Spotify playlist itself is kept.`)) return;
@@ -17,7 +19,10 @@ export default function PlaylistsPage() {
     <section>
       <div className="page-header">
         <h1>Playlists</h1>
-        <Link className="button primary" to="/playlists/new">New playlist</Link>
+        <div className="actions">
+          <ImportPlaylist onImported={(playlist) => navigate(`/playlists/${playlist.id}`)} />
+          <Link className="button primary" to="/playlists/new">New playlist</Link>
+        </div>
       </div>
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
       {playlists?.length === 0 && <p className="muted">No playlist configured yet.</p>}

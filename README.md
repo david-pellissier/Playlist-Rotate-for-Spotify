@@ -49,7 +49,9 @@ The database lives in `./data/spotify.db`.
 
 ## Web manager
 
-- **Playlists:** create, edit, delete and pause playlist configurations.
+- **Playlists:** create, edit, delete and pause playlist configurations. Export a configuration to a JSON
+  file and import it back. If a playlist with the same name exists, you choose between erasing its
+  configuration and importing a paused copy.
 - **Playlist page:**
   - refresh the catalog,
   - preview the next rotation (dry run) or rotate now,

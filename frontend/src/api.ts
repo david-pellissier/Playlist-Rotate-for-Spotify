@@ -1,6 +1,6 @@
 import type {
-  AuthStatus, Catalog, CatalogStatus, Playlist, PlaylistInput, PlaylistSummary, Progress, Rotation, Rule, RuleKind,
-  Settings,
+  AuthStatus, Catalog, CatalogStatus, ImportConflict, Playlist, PlaylistInput, PlaylistSummary, Progress, Rotation, Rule,
+  RuleKind, Settings,
 } from "./types";
 
 type ErrorDetail = string | { loc: (string | number)[]; msg: string }[] | undefined;
@@ -8,6 +8,12 @@ type ErrorDetail = string | { loc: (string | number)[]; msg: string }[] | undefi
 function describe(detail: ErrorDetail): string | undefined {
   if (Array.isArray(detail)) return detail.map((d) => `${d.loc.at(-1)}: ${d.msg}`).join(", ");
   return detail;
+}
+
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
 }
 
 async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
@@ -18,7 +24,7 @@ async function request<T>(path: string, method = "GET", body?: unknown): Promise
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
-    throw new Error(describe(payload.detail) ?? response.statusText);
+    throw new ApiError(describe(payload.detail) ?? response.statusText, response.status);
   }
   return response.status === 204 ? (undefined as T) : response.json();
 }
@@ -36,6 +42,9 @@ export const api = {
   createPlaylist: (data: PlaylistInput) => request<Playlist>("/playlists", "POST", data),
   updatePlaylist: (id: number, data: PlaylistInput) => request<Playlist>(`/playlists/${id}`, "PUT", data),
   deletePlaylist: (id: number) => request<void>(`/playlists/${id}`, "DELETE"),
+  exportUrl: (id: number) => `/api/playlists/${id}/export`,
+  importPlaylist: (data: unknown, onConflict: ImportConflict = "fail") =>
+    request<Playlist>(`/playlists/import?on_conflict=${onConflict}`, "POST", data),
   createPlaylistRule: (id: number, kind: RuleKind, pattern: string) =>
     request<Rule>(`/playlists/${id}/rules`, "POST", { kind, pattern }),
 
