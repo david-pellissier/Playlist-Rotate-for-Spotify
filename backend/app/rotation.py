@@ -8,7 +8,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from .catalog import Entry, load_catalog
-from .models import Artist, Playlist, PlaylistTrack, Settings, utcnow
+from .models import Artist, Playlist, PlaylistTrack, Settings, local_date, utcnow
 from .progress import Progress, track
 from .spotify import spotify
 from .sync import resolve_artists, sync_artists
@@ -16,6 +16,10 @@ from .sync import resolve_artists, sync_artists
 log = logging.getLogger(__name__)
 
 rotation_lock = asyncio.Lock()
+
+
+class RotationError(Exception):
+    pass
 
 
 @dataclass(slots=True)
@@ -40,8 +44,7 @@ class RotationPlan:
 
 
 def new_release_cutoff(playlist: Playlist, now: datetime) -> date:
-    since = playlist.last_rotated_at or now - timedelta(days=playlist.update_interval_days)
-    return since.date()
+    return local_date(playlist.last_rotated_at or now - timedelta(days=playlist.update_interval_days))
 
 
 def artist_cooldown(eligible: int, songs_per_artist: int, min_cooldown: int) -> int:
@@ -147,7 +150,7 @@ async def _rotate(session: Session, playlist: Playlist, dry_run: bool, progress:
         if dry_run:
             return plan
         if not plan.order:
-            raise ValueError("No eligible tracks to put in the playlist")
+            raise RotationError("No eligible tracks to put in the playlist")
         progress.start("Updating the Spotify playlist")
         if not playlist.spotify_playlist_id:
             playlist.spotify_playlist_id = await spotify.resolve_playlist(playlist.spotify_target)

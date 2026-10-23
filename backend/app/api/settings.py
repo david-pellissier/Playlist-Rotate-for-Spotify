@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..config import env
 from ..db import get_session
-from ..models import Rule, Settings
+from ..models import Playlist, Rule, Settings
 from ..schemas import AuthStatus, RuleIn, RuleOut, SettingsData
 from ..spotify import SpotifyError, spotify
 
@@ -46,6 +46,9 @@ def delete_rule(rule_id: int, session: Session = Depends(get_session)):
     rule = session.get(Rule, rule_id)
     if rule is None:
         raise HTTPException(404, "Rule not found")
+    for playlist in session.scalars(select(Playlist)):
+        if rule_id in playlist.disabled_rule_ids:
+            playlist.disabled_rule_ids = [other for other in playlist.disabled_rule_ids if other != rule_id]
     session.delete(rule)
     session.commit()
 
@@ -68,6 +71,7 @@ async def auth_callback(code: str | None = None, error: str | None = None):
     except SpotifyError as failure:
         return f"<p>{escape(str(failure))}</p>"
     return (
-        "<p>Add this line to your <code>.env</code> file, then restart the container:</p>"
+        "<p>Add this line to your <code>.env</code> file, then restart the daemon"
+        " with <code>docker compose up -d daemon</code>:</p>"
         f"<pre>SPOTIFY_REFRESH_TOKEN={refresh_token}</pre>"
     )

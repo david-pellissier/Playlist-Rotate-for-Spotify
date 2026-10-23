@@ -73,7 +73,7 @@ export default function PlaylistFormPage() {
       <div className="page-header">
         <h1>{id ? `Edit ${(data[2] as Playlist).name}` : "New playlist"}</h1>
         <div className="actions">
-          <button type="button" onClick={() => navigate(-1)}>Cancel</button>
+          <button type="button" onClick={() => navigate(id ? `/playlists/${id}` : "/")}>Cancel</button>
           <button className="primary" disabled={save.busy}>Save</button>
         </div>
       </div>

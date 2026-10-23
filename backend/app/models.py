@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import JSON, ForeignKey, String, Text
@@ -14,6 +15,10 @@ DEFAULT_KEYWORDS = (
 
 def utcnow() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def local_date(moment: datetime) -> date:
+    return moment.replace(tzinfo=UTC).astimezone(env.timezone).date()
 
 
 class Artist(Base):
@@ -102,15 +107,23 @@ class Playlist(Base):
 
     @property
     def next_rotation_at(self) -> datetime:
-        return self.next_rotation_after(self.last_rotated_at)
+        if not self.last_rotated_at:
+            return self._rotation_on(self.first_rotation_date)
+        return self._rotation_on(self._rotation_day_from(local_date(self.last_rotated_at) + timedelta(days=1)))
 
-    def next_rotation_after(self, moment: datetime | None) -> datetime:
-        day = self.first_rotation_date
-        if moment:
-            last_day = moment.replace(tzinfo=UTC).astimezone(env.timezone).date()
-            if last_day >= day:
-                periods = (last_day - day).days // self.update_interval_days + 1
-                day += timedelta(days=periods * self.update_interval_days)
+    def next_rotation_after(self, moment: datetime) -> datetime:
+        day = self._rotation_day_from(local_date(moment))
+        if self._rotation_on(day) <= moment:
+            day = self._rotation_day_from(day + timedelta(days=1))
+        return self._rotation_on(day)
+
+    def _rotation_day_from(self, day: date) -> date:
+        if day <= self.first_rotation_date:
+            return self.first_rotation_date
+        periods = math.ceil((day - self.first_rotation_date).days / self.update_interval_days)
+        return self.first_rotation_date + timedelta(days=periods * self.update_interval_days)
+
+    def _rotation_on(self, day: date) -> datetime:
         scheduled = datetime.combine(day, self.rotation_time, env.timezone)
         return scheduled.astimezone(UTC).replace(tzinfo=None)
 

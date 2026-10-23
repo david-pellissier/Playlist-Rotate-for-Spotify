@@ -1,3 +1,4 @@
+import math
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -123,6 +124,7 @@ def read_catalog(
         for entry in catalog.get(current_artist, [])
         if matches(entry) and matches_query(entry, query)
     ]
+    page = min(page, max(1, math.ceil(len(selected) / CATALOG_PAGE_SIZE)))
     start = (page - 1) * CATALOG_PAGE_SIZE
 
     albums: dict[str, AlbumOut] = {}

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from .api import playlists, settings, transfer
 from .models import init_db
 from .scheduler import run_scheduler
+from .rotation import RotationError
 from .spotify import SpotifyError, spotify
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -37,6 +38,6 @@ async def spotify_error(_: Request, error: SpotifyError):
     return JSONResponse({"detail": str(error)}, status_code=502)
 
 
-@app.exception_handler(ValueError)
-async def value_error(_: Request, error: ValueError):
+@app.exception_handler(RotationError)
+async def rotation_error(_: Request, error: RotationError):
     return JSONResponse({"detail": str(error)}, status_code=400)

@@ -29,7 +29,9 @@ async def resolve_artists(session: Session, names: list[str], progress: Progress
     for name, data in zip(unknown, found):
         if data is None:
             log.error("No exact Spotify match for artist %r", name)
-        elif session.get(Artist, data["id"]) is None:
+        elif artist := session.get(Artist, data["id"]):
+            artist.name = data["name"]
+        else:
             session.add(Artist(id=data["id"], name=data["name"]))
     session.commit()
     return known_artists(session, names)
@@ -69,7 +71,7 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
             name=data["name"],
             album_type=data["album_type"],
             release_date=parse_release_date(data["release_date"]),
-            image_url=data["images"][-1]["url"] if data["images"] else None,
+            image_url=data["images"][-1]["url"] if data.get("images") else None,
         )
         album.tracks = [
             Track(

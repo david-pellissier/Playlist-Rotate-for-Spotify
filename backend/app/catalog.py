@@ -46,7 +46,7 @@ class Entry:
 class RuleMatcher:
     def __init__(self, rules: list[Rule]) -> None:
         keywords = sorted({re.escape(r.pattern) for r in rules if r.kind == "keyword"}, key=len, reverse=True)
-        self._keywords = re.compile(rf"\b(?:{'|'.join(keywords)})\b", re.IGNORECASE) if keywords else None
+        self._keywords = re.compile(rf"(?<!\w)(?:{'|'.join(keywords)})(?!\w)", re.IGNORECASE) if keywords else None
         self._regexes = [(r.pattern, re.compile(r.pattern, re.IGNORECASE)) for r in rules if r.kind == "regex"]
 
     def match(self, text: str) -> str | None:
@@ -97,7 +97,7 @@ def _exclusion(playlist: Playlist, matcher: RuleMatcher, entry: Entry, album_dis
         return "album disabled"
     if entry.state and entry.state.disabled:
         return "disabled"
-    if track.artist_ids[0] != album.artist_id:
+    if not track.artist_ids or track.artist_ids[0] != album.artist_id:
         return "guest appearance"
     if playlist.solo_only and len(track.artist_ids) > 1:
         return "featuring"

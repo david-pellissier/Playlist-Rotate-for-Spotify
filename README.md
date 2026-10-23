@@ -50,6 +50,8 @@ It runs as two containers:
    ```
 
 The database lives in `./data/spotify.db`. Don't open it in another program while the daemon is running.
+If Spotify ever issues a new refresh token, the daemon saves it to `./data/spotify_token.json` and uses it
+until you put a different token in `.env`.
 
 ## Daily use
 
@@ -107,6 +109,8 @@ docker compose stop web
 | `DATABASE_PATH` | `/data/spotify.db` | SQLite file |
 
 ## Development
+
+Requires Python 3.12+ and Node 22.
 
 ```bash
 cd backend

@@ -1,4 +1,6 @@
 import asyncio
+import json
+import logging
 import re
 import time
 from collections.abc import AsyncIterator
@@ -12,12 +14,16 @@ from .config import env
 API_URL = "https://api.spotify.com/v1"
 AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
+TOKEN_FILE = env.database_path.parent / "spotify_token.json"
 SCOPES = "playlist-read-private playlist-modify-public playlist-modify-private"
 ALBUM_GROUPS = ("album", "single")
 PLAYLIST_ID = re.compile(r"(?:playlist[/:])([A-Za-z0-9]{22})|^([A-Za-z0-9]{22})$")
-MAX_RETRIES = 5
+IDEMPOTENT_METHODS = {"GET", "PUT", "DELETE"}
+MAX_ATTEMPTS = 5
 MAX_CONCURRENCY = 8
 PLAYLIST_CHUNK = 100
+
+log = logging.getLogger(__name__)
 
 
 class SpotifyError(Exception):
@@ -25,13 +31,26 @@ class SpotifyError(Exception):
 
 
 def parse_release_date(value: str) -> date:
-    parts = [int(part) for part in value.split("-")] + [1, 1]
-    return date(*parts[:3])
+    year, month, day = ([int(part) for part in value.split("-")] + [1, 1])[:3]
+    return date(max(year, 1), max(month, 1), max(day, 1))
+
+
+def load_refresh_token() -> str:
+    try:
+        saved = json.loads(TOKEN_FILE.read_text())
+    except (OSError, ValueError):
+        return env.refresh_token
+    return saved["token"] if saved.get("configured") == env.refresh_token else env.refresh_token
+
+
+def save_refresh_token(token: str) -> None:
+    TOKEN_FILE.write_text(json.dumps({"configured": env.refresh_token, "token": token}))
 
 
 class Spotify:
     def __init__(self) -> None:
         self._http = httpx.AsyncClient(base_url=API_URL, timeout=30)
+        self._refresh_token = load_refresh_token()
         self._token = ""
         self._token_expires_at = 0.0
         self._token_lock = asyncio.Lock()
@@ -51,61 +70,80 @@ class Spotify:
         return f"{AUTHORIZE_URL}?{urlencode(query)}"
 
     async def exchange_code(self, code: str) -> str:
-        response = await self._http.post(
-            TOKEN_URL,
-            data={"grant_type": "authorization_code", "code": code, "redirect_uri": env.redirect_uri},
-            auth=(env.client_id, env.client_secret),
+        payload = await self._token_request(
+            {"grant_type": "authorization_code", "code": code, "redirect_uri": env.redirect_uri}
         )
+        return payload["refresh_token"]
+
+    async def _token_request(self, data: dict) -> dict:
+        try:
+            response = await self._http.post(TOKEN_URL, data=data, auth=(env.client_id, env.client_secret))
+        except httpx.TransportError as error:
+            raise SpotifyError(f"Could not reach Spotify: {error!r}") from error
         if response.is_error:
-            raise SpotifyError(f"Authorization failed: {response.text}")
-        return response.json()["refresh_token"]
+            raise SpotifyError(f"Spotify authorization failed: {response.text}")
+        return response.json()
 
     async def _access_token(self) -> str:
         async with self._token_lock:
             if time.monotonic() < self._token_expires_at:
                 return self._token
-            if not (env.client_id and env.client_secret and env.refresh_token):
+            if not (env.client_id and env.client_secret and self._refresh_token):
                 raise SpotifyError("Spotify credentials are missing from the environment")
-            response = await self._http.post(
-                TOKEN_URL,
-                data={"grant_type": "refresh_token", "refresh_token": env.refresh_token},
-                auth=(env.client_id, env.client_secret),
-            )
-            if response.is_error:
-                raise SpotifyError(f"Token refresh failed: {response.text}")
-            payload = response.json()
+            payload = await self._token_request({"grant_type": "refresh_token", "refresh_token": self._refresh_token})
+            if payload.get("refresh_token", self._refresh_token) != self._refresh_token:
+                self._refresh_token = payload["refresh_token"]
+                save_refresh_token(self._refresh_token)
+                log.info("Spotify issued a new refresh token, saved to %s", TOKEN_FILE)
             self._token = payload["access_token"]
             self._token_expires_at = time.monotonic() + payload["expires_in"] - 60
             return self._token
 
     async def request(self, method: str, url: str, **kwargs) -> dict | None:
+        retryable = method in IDEMPOTENT_METHODS
+        problem = ""
         async with self._slots:
-            for _ in range(MAX_RETRIES):
+            for attempt in range(MAX_ATTEMPTS):
                 headers = {"Authorization": f"Bearer {await self._access_token()}"}
-                response = await self._http.request(method, url, headers=headers, **kwargs)
+                try:
+                    response = await self._http.request(method, url, headers=headers, **kwargs)
+                except httpx.TransportError as error:
+                    if not retryable:
+                        raise SpotifyError(f"{method} {url} failed: {error!r}") from error
+                    problem = repr(error)
+                    await asyncio.sleep(2 ** attempt)
+                    continue
                 if response.status_code == 429:
+                    problem = "rate limited"
                     await asyncio.sleep(int(response.headers.get("Retry-After", "1")) + 1)
                     continue
                 if response.status_code == 401:
+                    problem = "unauthorized"
                     self._token_expires_at = 0
+                    continue
+                if response.status_code >= 500 and retryable:
+                    problem = f"status {response.status_code}"
+                    await asyncio.sleep(2 ** attempt)
                     continue
                 if response.is_error:
                     raise SpotifyError(f"{method} {url} failed ({response.status_code}): {response.text}")
                 return response.json() if response.content else None
-        raise SpotifyError(f"{method} {url} failed after {MAX_RETRIES} attempts")
+        raise SpotifyError(f"{method} {url} failed after {MAX_ATTEMPTS} attempts ({problem})")
 
     async def paginate(self, url: str, params: dict | None = None) -> AsyncIterator[list[dict]]:
         next_url: str | None = url
         while next_url:
             page = await self.request("GET", next_url, params=params)
             params = None
-            yield page["items"]
+            yield [item for item in page["items"] if item]
             next_url = page["next"]
 
     async def find_artist(self, name: str) -> dict | None:
         result = await self.request("GET", "/search", params={"q": name, "type": "artist", "limit": 10})
         wanted = name.casefold()
-        return next((artist for artist in result["artists"]["items"] if artist["name"].casefold() == wanted), None)
+        return next(
+            (artist for artist in result["artists"]["items"] if artist and artist["name"].casefold() == wanted), None
+        )
 
     async def artist_albums(self, artist_id: str, released_after: date | None) -> list[dict]:
         async def fetch_group(group: str) -> list[dict]:
@@ -128,9 +166,10 @@ class Spotify:
     async def resolve_playlist(self, target: str) -> str:
         if match := PLAYLIST_ID.search(target.split("?")[0].strip()):
             return match.group(1) or match.group(2)
+        user_id = (await self.request("GET", "/me"))["id"]
         async for page in self.paginate("/me/playlists"):
             for playlist in page:
-                if playlist and playlist["name"] == target:
+                if playlist["name"] == target and playlist["owner"]["id"] == user_id:
                     return playlist["id"]
         created = await self.request("POST", "/me/playlists", json={"name": target, "public": False})
         return created["id"]

@@ -2,14 +2,14 @@ import re
 from datetime import UTC, date, datetime, time
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, ValidationInfo, field_validator
 
 UtcDatetime = Annotated[datetime, PlainSerializer(lambda value: value.replace(tzinfo=UTC).isoformat(), when_used="json")]
 ClockTime = Annotated[time, PlainSerializer(lambda value: value.strftime("%H:%M"), when_used="json")]
 
 
 class Schema(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, str_strip_whitespace=True)
 
 
 class SettingsData(Schema):
@@ -27,13 +27,13 @@ class RuleIn(Schema):
 
     @field_validator("pattern")
     @classmethod
-    def valid_regex(cls, pattern: str, info) -> str:
+    def valid_regex(cls, pattern: str, info: ValidationInfo) -> str:
         if info.data.get("kind") == "regex":
             try:
                 re.compile(pattern)
             except re.error as error:
                 raise ValueError(f"Invalid regex: {error}") from error
-        return pattern.strip()
+        return pattern
 
 
 class RuleOut(RuleIn):

@@ -11,9 +11,12 @@ export default function RuleList(props: {
   const [pattern, setPattern] = useState("");
   const action = useAction();
 
+  const canAdd = pattern.trim() !== "" && !action.busy;
+
   async function add(event: SyntheticEvent) {
     event.preventDefault();
     event.stopPropagation();
+    if (!canAdd) return;
     await action.run(async () => {
       await props.onCreate(kind, pattern);
       setPattern("");
@@ -45,7 +48,7 @@ export default function RuleList(props: {
           onChange={(e) => setPattern(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && add(e)}
         />
-        <button type="button" disabled={!pattern.trim() || action.busy} onClick={add}>Add rule</button>
+        <button type="button" disabled={!canAdd} onClick={add}>Add rule</button>
       </div>
     </div>
   );
