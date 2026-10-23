@@ -1,0 +1,150 @@
+import re
+from datetime import UTC, date, datetime
+from typing import Annotated, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
+
+UtcDatetime = Annotated[datetime, PlainSerializer(lambda value: value.replace(tzinfo=UTC).isoformat())]
+
+
+class Schema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SettingsData(Schema):
+    min_cooldown: int = Field(ge=0)
+    min_duration: int = Field(ge=0)
+    max_duration: int | None = Field(default=None, ge=1)
+    solo_only: bool
+    exclude_duplicates: bool
+    refresh_lookback_days: int = Field(ge=0)
+
+
+class RuleIn(Schema):
+    kind: Literal["keyword", "regex"]
+    pattern: str = Field(min_length=1)
+
+    @field_validator("pattern")
+    @classmethod
+    def valid_regex(cls, pattern: str, info) -> str:
+        if info.data.get("kind") == "regex":
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                raise ValueError(f"Invalid regex: {error}") from error
+        return pattern.strip()
+
+
+class RuleOut(RuleIn):
+    id: int
+
+
+class PlaylistIn(Schema):
+    name: str = Field(min_length=1)
+    spotify_target: str = Field(min_length=1)
+    artist_names: list[str]
+    songs_per_artist: int = Field(ge=1)
+    max_new_releases: int = Field(ge=0)
+    update_interval_days: int = Field(ge=1)
+    shuffle: bool
+    enabled: bool
+    min_duration: int = Field(ge=0)
+    max_duration: int | None = Field(default=None, ge=1)
+    solo_only: bool
+    exclude_duplicates: bool
+    disabled_rule_ids: list[int]
+
+    @field_validator("artist_names")
+    @classmethod
+    def clean_names(cls, names: list[str]) -> list[str]:
+        return list(dict.fromkeys(name.strip() for name in names if name.strip()))
+
+
+class PlaylistOut(PlaylistIn):
+    id: int
+    spotify_playlist_id: str | None
+    last_rotated_at: UtcDatetime | None
+    last_error: str | None
+    rules: list[RuleOut]
+
+
+class PlaylistSummary(Schema):
+    id: int
+    name: str
+    spotify_target: str
+    artist_count: int
+    enabled: bool
+    update_interval_days: int
+    last_rotated_at: UtcDatetime | None
+    next_rotation_at: UtcDatetime | None
+    last_error: str | None
+
+
+class TrackOut(BaseModel):
+    id: str
+    name: str
+    duration: int
+    released: date
+    exclusion: str | None
+    disabled: bool
+    cooldown: int
+    current: bool
+    play_count: int
+
+
+class AlbumOut(BaseModel):
+    id: str
+    artist_name: str
+    name: str
+    album_type: str
+    release_date: date
+    image_url: str | None
+    disabled: bool
+    tracks: list[TrackOut]
+
+
+class ArtistOut(BaseModel):
+    id: str
+    name: str
+    total: int
+    eligible: int
+    on_cooldown: int
+
+
+class CatalogOut(BaseModel):
+    artists: list[ArtistOut]
+    missing_artists: list[str]
+    albums: list[AlbumOut]
+    truncated: bool
+
+
+class ToggleIn(BaseModel):
+    disabled: bool
+
+
+class PickOut(BaseModel):
+    track_id: str
+    name: str
+    album_name: str
+    artist_name: str
+    duration: int
+    source: str
+
+
+class SelectionOut(BaseModel):
+    artist_name: str
+    eligible: int
+    cooldown: int
+    picks: list[PickOut]
+
+
+class RotationOut(BaseModel):
+    dry_run: bool
+    selections: list[SelectionOut]
+    missing_artists: list[str]
+    order: list[PickOut]
+
+
+class AuthStatus(BaseModel):
+    configured: bool
+    authorize_url: str | None
