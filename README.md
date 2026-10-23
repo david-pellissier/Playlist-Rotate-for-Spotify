@@ -7,6 +7,8 @@ It runs as two containers:
 - **daemon:** runs 24/7, rotates the playlists and owns the database. It publishes no port.
 - **web:** the manager UI. Start it when you want to change something; rotations don't need it.
 
+![demo](./demo.png)
+
 ## Personal note and disclaimer
 
 > [!CAUTION] 
