@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import CatalogView from "../components/CatalogView";
+import HistoryView from "../components/HistoryView";
 import JobProgress, { useJobProgress } from "../components/JobProgress";
 import Menu from "../components/Menu";
 import PlaylistStatus from "../components/PlaylistStatus";
@@ -10,7 +11,7 @@ import { formatDate, formatSchedule } from "../format";
 import { useAction, useLoader } from "../hooks";
 import type { Rotation } from "../types";
 
-type Tab = "songs" | "rotation";
+type Tab = "songs" | "rotation" | "history";
 
 export default function PlaylistPage() {
   const id = Number(useParams().id);
@@ -102,9 +103,11 @@ export default function PlaylistPage() {
       <div className="tabs" role="tablist">
         <TabButton active={tab === "songs"} onClick={() => setTab("songs")}>Songs</TabButton>
         <TabButton active={tab === "rotation"} onClick={() => setTab("rotation")}>Rotation preview</TabButton>
+        <TabButton active={tab === "history"} onClick={() => setTab("history")}>History</TabButton>
       </div>
 
       {tab === "songs" && <CatalogView playlistId={id} version={catalogVersion} />}
+      {tab === "history" && <HistoryView playlistId={id} version={catalogVersion} />}
       {tab === "rotation" && (rotation
         ? <RotationView rotation={rotation} />
         : (

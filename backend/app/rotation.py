@@ -8,7 +8,7 @@ from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from .catalog import Entry, load_catalog
-from .models import Artist, Playlist, PlaylistTrack, Settings, local_date, utcnow
+from .models import Artist, Playlist, PlaylistTrack, Rotation, RotationTrack, Settings, local_date, utcnow
 from .progress import Progress, track
 from .spotify import spotify
 from .sync import resolve_artists, sync_artists
@@ -100,7 +100,7 @@ def plan_rotation(
     return RotationPlan(selections, missing, order)
 
 
-def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now: datetime) -> None:
+def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now: datetime, trigger: str) -> None:
     in_playlist = PlaylistTrack.playlist_id == playlist.id
     session.execute(update(PlaylistTrack).where(in_playlist).values(current=False))
     session.execute(
@@ -119,6 +119,15 @@ def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now
 
     playlist.last_rotated_at = now
     playlist.last_error = None
+    session.add(Rotation(
+        playlist_id=playlist.id,
+        rotated_at=now,
+        trigger=trigger,
+        tracks=[
+            RotationTrack(position=position, track_id=pick.entry.track.id, source=pick.source)
+            for position, pick in enumerate(plan.order)
+        ],
+    ))
 
 
 async def _refresh_catalog(
@@ -135,13 +144,15 @@ async def refresh_catalog(session: Session, playlist: Playlist) -> None:
             await _refresh_catalog(session, playlist, progress)
 
 
-async def rotate(session: Session, playlist: Playlist, dry_run: bool) -> RotationPlan:
+async def rotate(session: Session, playlist: Playlist, dry_run: bool, trigger: str = "manual") -> RotationPlan:
     with track(playlist.id) as progress:
         async with rotation_lock:
-            return await _rotate(session, playlist, dry_run, progress)
+            return await _rotate(session, playlist, dry_run, trigger, progress)
 
 
-async def _rotate(session: Session, playlist: Playlist, dry_run: bool, progress: Progress) -> RotationPlan:
+async def _rotate(
+    session: Session, playlist: Playlist, dry_run: bool, trigger: str, progress: Progress
+) -> RotationPlan:
     try:
         artists, missing = await _refresh_catalog(session, playlist, progress)
         progress.start("Selecting tracks")
@@ -155,7 +166,7 @@ async def _rotate(session: Session, playlist: Playlist, dry_run: bool, progress:
         if not playlist.spotify_playlist_id:
             playlist.spotify_playlist_id = await spotify.resolve_playlist(playlist.spotify_target)
         await spotify.replace_playlist_items(playlist.spotify_playlist_id, [p.entry.track.uri for p in plan.order])
-        apply_rotation(session, playlist, plan, now)
+        apply_rotation(session, playlist, plan, now, trigger)
         session.commit()
         log.info("Rotated %s with %d tracks", playlist.name, len(plan.order))
         return plan
@@ -163,5 +174,6 @@ async def _rotate(session: Session, playlist: Playlist, dry_run: bool, progress:
         session.rollback()
         if not dry_run:
             playlist.last_error = str(error)
+            session.add(Rotation(playlist_id=playlist.id, rotated_at=utcnow(), trigger=trigger, error=str(error)))
             session.commit()
         raise

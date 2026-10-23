@@ -175,3 +175,29 @@ class ProgressOut(Schema):
 class AuthStatus(BaseModel):
     configured: bool
     authorize_url: str | None
+
+
+class RotationSummary(BaseModel):
+    id: int
+    rotated_at: UtcDatetime
+    trigger: Literal["manual", "scheduled"]
+    error: str | None
+    track_count: int
+    new_releases: int
+
+
+class HistoryOut(BaseModel):
+    rotations: list[RotationSummary]
+    total: int
+    page: int
+    page_size: int
+
+
+class RotationTrackOut(BaseModel):
+    position: int
+    track_id: str
+    name: str
+    artist_name: str
+    album_name: str
+    duration: int
+    source: str

@@ -155,6 +155,31 @@ class DisabledAlbum(Base):
     album_id: Mapped[str] = mapped_column(ForeignKey("albums.id", ondelete="CASCADE"), primary_key=True)
 
 
+class Rotation(Base):
+    __tablename__ = "rotations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), index=True)
+    rotated_at: Mapped[datetime]
+    trigger: Mapped[str]
+    error: Mapped[str | None]
+
+    tracks: Mapped[list["RotationTrack"]] = relationship(
+        cascade="all, delete-orphan", passive_deletes=True, order_by="RotationTrack.position"
+    )
+
+
+class RotationTrack(Base):
+    __tablename__ = "rotation_tracks"
+
+    rotation_id: Mapped[int] = mapped_column(ForeignKey("rotations.id", ondelete="CASCADE"), primary_key=True)
+    position: Mapped[int] = mapped_column(primary_key=True)
+    track_id: Mapped[str] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"))
+    source: Mapped[str]
+
+    track: Mapped[Track] = relationship()
+
+
 class EnabledAlbum(Base):
     __tablename__ = "enabled_albums"
 

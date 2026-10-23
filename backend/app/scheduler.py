@@ -62,7 +62,7 @@ async def rotate_due_playlists() -> None:
             if not is_due(playlist, now):
                 continue
             try:
-                await rotate(session, playlist, dry_run=False)
+                await rotate(session, playlist, dry_run=False, trigger="scheduled")
                 failures.pop(playlist.id, None)
             except Exception:
                 record_failure(playlist, now)

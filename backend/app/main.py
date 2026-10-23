@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from .api import playlists, settings, transfer
+from .api import history, playlists, settings, transfer
 from .models import init_db
 from .scheduler import run_scheduler
 from .rotation import RotationError
@@ -30,6 +30,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Spotify Playlist Rotate", lifespan=lifespan)
 app.include_router(settings.router)
 app.include_router(transfer.router)
+app.include_router(history.router)
 app.include_router(playlists.router)
 
 

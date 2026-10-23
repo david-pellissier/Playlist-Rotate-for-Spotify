@@ -526,6 +526,10 @@ th.numeric {
   white-space: nowrap;
 }
 
+.show-sm {
+  display: none;
+}
+
 /* Badges and alerts */
 
 .badge {
@@ -574,7 +578,7 @@ td .badge {
   border-radius: 11px;
   line-height: 1.35;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .error:not(.badge),
@@ -1074,6 +1078,10 @@ ul.plain li.pick .row {
     display: none;
   }
 
+  .show-sm {
+    display: block;
+  }
+
   .cell-title {
     min-width: 0;
   }
@@ -1155,4 +1163,33 @@ ul.plain li.pick .row {
 .modal ul.plain li {
   display: block;
   color: var(--text-secondary);
+}
+
+tr.history-detail td {
+  padding-top: 0;
+  background: var(--surface-muted);
+}
+
+tbody tr.history-detail:hover td {
+  background: var(--surface-muted);
+}
+
+.history-tracks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 6px 20px;
+  margin: 0;
+  padding: 12px 0 4px 22px;
+}
+
+.history-tracks li {
+  padding-left: 2px;
+}
+
+.history-tracks li > small {
+  display: block;
+}
+
+.history-tracks .badge {
+  margin-top: 2px;
 }

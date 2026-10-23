@@ -132,3 +132,29 @@ export interface AuthStatus {
   configured: boolean;
   authorize_url: string | null;
 }
+
+export interface RotationSummary {
+  id: number;
+  rotated_at: string;
+  trigger: "manual" | "scheduled";
+  error: string | null;
+  track_count: number;
+  new_releases: number;
+}
+
+export interface History {
+  rotations: RotationSummary[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
+export interface RotationTrack {
+  position: number;
+  track_id: string;
+  name: string;
+  artist_name: string;
+  album_name: string;
+  duration: number;
+  source: Pick["source"];
+}
