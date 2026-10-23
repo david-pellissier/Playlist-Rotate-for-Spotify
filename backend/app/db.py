@@ -18,9 +18,8 @@ SessionLocal = sessionmaker(engine, expire_on_commit=False)
 @event.listens_for(engine, "connect")
 def _configure_sqlite(connection, _):
     cursor = connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA journal_mode=DELETE")
     cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.close()
 
 
