@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "../api";
 import { formatDuration } from "../format";
 import { useAction, useDebounced, useLoader } from "../hooks";
-import type { CatalogAlbum, CatalogStatus, CatalogTrack } from "../types";
+import type { Catalog, CatalogAlbum, CatalogStatus, CatalogTrack } from "../types";
 
 const STATUSES: Record<CatalogStatus, string> = {
   all: "All songs",
@@ -16,10 +16,21 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
   const [artistId, setArtistId] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<CatalogStatus>("all");
+  const [page, setPage] = useState(1);
   const q = useDebounced(search);
+
+  function filter(apply: () => void) {
+    apply();
+    setPage(1);
+  }
+
+  function goTo(target: number) {
+    setPage(target);
+    scrollTo(0, 0);
+  }
   const { data: catalog, error, reload } = useLoader(
-    () => api.catalog(playlistId, { artistId, q, status }),
-    [playlistId, artistId, q, status, version],
+    () => api.catalog(playlistId, { artistId, q, status, page }),
+    [playlistId, artistId, q, status, page, version],
   );
   const action = useAction();
 
@@ -36,7 +47,7 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
   return (
     <div className="stack">
       <div className="inline">
-        <select value={artistId} onChange={(e) => setArtistId(e.target.value)}>
+        <select value={artistId} onChange={(e) => filter(() => setArtistId(e.target.value))}>
           <option value="">All artists</option>
           {catalog?.artists.map((artist) => (
             <option key={artist.id} value={artist.id}>
@@ -44,10 +55,10 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
             </option>
           ))}
         </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value as CatalogStatus)}>
+        <select value={status} onChange={(e) => filter(() => setStatus(e.target.value as CatalogStatus))}>
           {Object.entries(STATUSES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <input type="search" placeholder="Search songs or albums" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input type="search" placeholder="Search songs or albums" value={search} onChange={(e) => filter(() => setSearch(e.target.value))} />
       </div>
 
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
@@ -56,7 +67,7 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
           Not in the catalog yet (refresh it, or check the exact name): {catalog.missing_artists.join(", ")}
         </p>
       )}
-      {catalog?.truncated && <p className="notice">Too many results, refine the search to see everything.</p>}
+      {catalog && <Pager catalog={catalog} onPage={setPage} />}
       {catalog?.albums.length === 0 && <p className="muted">No songs match.</p>}
 
       {catalog?.albums.map((album) => (
@@ -90,6 +101,23 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
           </table>
         </article>
       ))}
+
+      {catalog && catalog.albums.length > 0 && <Pager catalog={catalog} onPage={goTo} />}
+    </div>
+  );
+}
+
+function Pager({ catalog, onPage }: { catalog: Catalog; onPage: (page: number) => void }) {
+  const pages = Math.max(1, Math.ceil(catalog.total_tracks / catalog.page_size));
+  const first = Math.min((catalog.page - 1) * catalog.page_size + 1, catalog.total_tracks);
+  const last = Math.min(catalog.page * catalog.page_size, catalog.total_tracks);
+  return (
+    <div className="pager">
+      <button disabled={catalog.page <= 1} onClick={() => onPage(catalog.page - 1)}>Previous</button>
+      <span className="muted">
+        {first}–{last} of {catalog.total_tracks} songs · page {catalog.page} of {pages}
+      </span>
+      <button disabled={catalog.page >= pages} onClick={() => onPage(catalog.page + 1)}>Next</button>
     </div>
   );
 }

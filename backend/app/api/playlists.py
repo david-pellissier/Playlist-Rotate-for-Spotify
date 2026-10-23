@@ -1,7 +1,7 @@
 from datetime import timedelta
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -18,7 +18,7 @@ from ..sync import known_artists
 
 router = APIRouter(prefix="/api/playlists")
 
-MAX_CATALOG_TRACKS = 2000
+CATALOG_PAGE_SIZE = 250
 STATUS_FILTERS = {
     "all": lambda e: True,
     "eligible": lambda e: e.eligible,
@@ -103,6 +103,7 @@ def read_catalog(
     artist_id: str | None = None,
     q: str = "",
     status: Literal["all", "eligible", "excluded", "cooldown", "current"] = "all",
+    page: int = Query(1, ge=1),
     playlist: Playlist = Depends(get_playlist),
     session: Session = Depends(get_session),
 ):
@@ -115,28 +116,27 @@ def read_catalog(
     matches = STATUS_FILTERS[status]
     query = q.strip().casefold()
 
+    selected = [
+        entry
+        for current_artist in ([artist_id] if artist_id else names)
+        for entry in catalog.get(current_artist, [])
+        if matches(entry) and matches_query(entry, query)
+    ]
+    start = (page - 1) * CATALOG_PAGE_SIZE
+
     albums: dict[str, AlbumOut] = {}
-    count = 0
-    truncated = False
-    for current_artist in [artist_id] if artist_id else names:
-        for entry in catalog.get(current_artist, []):
-            if not matches(entry) or not matches_query(entry, query):
-                continue
-            if count == MAX_CATALOG_TRACKS:
-                truncated = True
-                break
-            album = albums.get(entry.album.id) or albums.setdefault(entry.album.id, AlbumOut(
-                id=entry.album.id,
-                artist_name=names[current_artist],
-                name=entry.album.name,
-                album_type=entry.album.album_type,
-                release_date=entry.album.release_date,
-                image_url=entry.album.image_url,
-                disabled=entry.album.id in disabled_albums,
-                tracks=[],
-            ))
-            album.tracks.append(track_out(entry))
-            count += 1
+    for entry in selected[start:start + CATALOG_PAGE_SIZE]:
+        album = albums.get(entry.album.id) or albums.setdefault(entry.album.id, AlbumOut(
+            id=entry.album.id,
+            artist_name=names[entry.album.artist_id],
+            name=entry.album.name,
+            album_type=entry.album.album_type,
+            release_date=entry.album.release_date,
+            image_url=entry.album.image_url,
+            disabled=entry.album.id in disabled_albums,
+            tracks=[],
+        ))
+        album.tracks.append(track_out(entry))
 
     return CatalogOut(
         artists=[
@@ -151,7 +151,9 @@ def read_catalog(
         ],
         missing_artists=missing,
         albums=list(albums.values()),
-        truncated=truncated,
+        total_tracks=len(selected),
+        page=page,
+        page_size=CATALOG_PAGE_SIZE,
     )
 
 

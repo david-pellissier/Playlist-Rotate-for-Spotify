@@ -111,7 +111,9 @@ class CatalogOut(BaseModel):
     artists: list[ArtistOut]
     missing_artists: list[str]
     albums: list[AlbumOut]
-    truncated: bool
+    total_tracks: int
+    page: int
+    page_size: int
 
 
 class ToggleIn(BaseModel):

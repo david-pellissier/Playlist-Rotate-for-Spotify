@@ -87,7 +87,9 @@ export interface Catalog {
   artists: CatalogArtist[];
   missing_artists: string[];
   albums: CatalogAlbum[];
-  truncated: boolean;
+  total_tracks: number;
+  page: number;
+  page_size: number;
 }
 
 export type CatalogStatus = "all" | "eligible" | "excluded" | "cooldown" | "current";

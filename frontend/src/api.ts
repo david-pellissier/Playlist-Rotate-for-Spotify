@@ -38,8 +38,8 @@ export const api = {
   createPlaylistRule: (id: number, kind: RuleKind, pattern: string) =>
     request<Rule>(`/playlists/${id}/rules`, "POST", { kind, pattern }),
 
-  catalog: (id: number, filters: { artistId: string; q: string; status: CatalogStatus }) => {
-    const params = new URLSearchParams({ q: filters.q, status: filters.status });
+  catalog: (id: number, filters: { artistId: string; q: string; status: CatalogStatus; page: number }) => {
+    const params = new URLSearchParams({ q: filters.q, status: filters.status, page: String(filters.page) });
     if (filters.artistId) params.set("artist_id", filters.artistId);
     return request<Catalog>(`/playlists/${id}/catalog?${params}`);
   },
