@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Album, Artist, Settings, Track, utcnow
+from .progress import Progress
 from .spotify import parse_release_date, spotify
 
 log = logging.getLogger(__name__)
@@ -20,9 +21,10 @@ def known_artists(session: Session, names: list[str]) -> tuple[list[Artist], lis
     return list(dict.fromkeys(artists)), missing
 
 
-async def resolve_artists(session: Session, names: list[str]) -> tuple[list[Artist], list[str]]:
+async def resolve_artists(session: Session, names: list[str], progress: Progress) -> tuple[list[Artist], list[str]]:
     _, unknown = known_artists(session, names)
-    found = await asyncio.gather(*(spotify.find_artist(name) for name in unknown))
+    progress.start("Finding artists", len(unknown))
+    found = await asyncio.gather(*(progress.count(spotify.find_artist(name)) for name in unknown))
 
     for name, data in zip(unknown, found):
         if data is None:
@@ -33,15 +35,16 @@ async def resolve_artists(session: Session, names: list[str]) -> tuple[list[Arti
     return known_artists(session, names)
 
 
-async def sync_artists(session: Session, artists: list[Artist]) -> None:
+async def sync_artists(session: Session, artists: list[Artist], progress: Progress) -> None:
     now = utcnow()
     stale = [artist for artist in artists if not artist.synced_at or now - artist.synced_at > RESYNC_AFTER]
     if not stale:
         return
 
     lookback = timedelta(days=session.get(Settings, 1).refresh_lookback_days)
+    progress.start("Listing albums", len(stale))
     album_lists = await asyncio.gather(*(
-        spotify.artist_albums(artist.id, (artist.synced_at - lookback).date() if artist.synced_at else None)
+        progress.count(spotify.artist_albums(artist.id, (artist.synced_at - lookback).date() if artist.synced_at else None))
         for artist in stale
     ))
 
@@ -53,7 +56,8 @@ async def sync_artists(session: Session, artists: list[Artist]) -> None:
             if data["id"] not in known_albums and data["id"] not in new_albums:
                 new_albums[data["id"]] = (artist, data)
 
-    track_lists = await asyncio.gather(*(spotify.album_tracks(album_id) for album_id in new_albums))
+    progress.start("Downloading tracks", len(new_albums))
+    track_lists = await asyncio.gather(*(progress.count(spotify.album_tracks(album_id)) for album_id in new_albums))
 
     seen_tracks = set()
     for (artist, data), tracks in zip(new_albums.values(), track_lists):

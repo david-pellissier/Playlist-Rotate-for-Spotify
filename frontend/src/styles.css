@@ -368,3 +368,18 @@ ul.plain {
   justify-content: space-between;
   gap: 12px;
 }
+
+.job-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.job-progress progress {
+  width: 100%;
+  accent-color: var(--accent);
+}

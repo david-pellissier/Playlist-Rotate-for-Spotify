@@ -1,5 +1,6 @@
 import type {
-  AuthStatus, Catalog, CatalogStatus, Playlist, PlaylistInput, PlaylistSummary, Rotation, Rule, RuleKind, Settings,
+  AuthStatus, Catalog, CatalogStatus, Playlist, PlaylistInput, PlaylistSummary, Progress, Rotation, Rule, RuleKind,
+  Settings,
 } from "./types";
 
 type ErrorDetail = string | { loc: (string | number)[]; msg: string }[] | undefined;
@@ -49,5 +50,6 @@ export const api = {
     request<void>(`/playlists/${id}/tracks/${trackId}`, "PUT", { disabled }),
   clearCooldowns: (id: number) => request<void>(`/playlists/${id}/clear-cooldowns`, "POST"),
   sync: (id: number) => request<void>(`/playlists/${id}/sync`, "POST"),
+  progress: (id: number) => request<Progress | null>(`/playlists/${id}/progress`),
   rotate: (id: number, dryRun: boolean) => request<Rotation>(`/playlists/${id}/rotate?dry_run=${dryRun}`, "POST"),
 };

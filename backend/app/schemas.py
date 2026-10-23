@@ -146,6 +146,12 @@ class RotationOut(BaseModel):
     order: list[PickOut]
 
 
+class ProgressOut(Schema):
+    step: str
+    done: int
+    total: int
+
+
 class AuthStatus(BaseModel):
     configured: bool
     authorize_url: str | None

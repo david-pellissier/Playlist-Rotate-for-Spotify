@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from .catalog import Entry, load_catalog
 from .models import Artist, Playlist, PlaylistTrack, Settings, utcnow
+from .progress import Progress, track
 from .spotify import spotify
 from .sync import resolve_artists, sync_artists
 
@@ -117,32 +118,47 @@ def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now
     playlist.last_error = None
 
 
-async def refresh_catalog(session: Session, playlist: Playlist) -> tuple[list[Artist], list[str]]:
-    artists, missing = await resolve_artists(session, playlist.artist_names)
-    await sync_artists(session, artists)
+async def _refresh_catalog(
+    session: Session, playlist: Playlist, progress: Progress
+) -> tuple[list[Artist], list[str]]:
+    artists, missing = await resolve_artists(session, playlist.artist_names, progress)
+    await sync_artists(session, artists, progress)
     return artists, missing
 
 
+async def refresh_catalog(session: Session, playlist: Playlist) -> None:
+    with track(playlist.id) as progress:
+        async with rotation_lock:
+            await _refresh_catalog(session, playlist, progress)
+
+
 async def rotate(session: Session, playlist: Playlist, dry_run: bool) -> RotationPlan:
-    async with rotation_lock:
-        try:
-            artists, missing = await refresh_catalog(session, playlist)
-            now = utcnow()
-            plan = plan_rotation(session, playlist, artists, missing, now)
-            if dry_run:
-                return plan
-            if not plan.order:
-                raise ValueError("No eligible tracks to put in the playlist")
-            if not playlist.spotify_playlist_id:
-                playlist.spotify_playlist_id = await spotify.resolve_playlist(playlist.spotify_target)
-            await spotify.replace_playlist_items(playlist.spotify_playlist_id, [p.entry.track.uri for p in plan.order])
-            apply_rotation(session, playlist, plan, now)
-            session.commit()
-            log.info("Rotated %s with %d tracks", playlist.name, len(plan.order))
+    with track(playlist.id) as progress:
+        async with rotation_lock:
+            return await _rotate(session, playlist, dry_run, progress)
+
+
+async def _rotate(session: Session, playlist: Playlist, dry_run: bool, progress: Progress) -> RotationPlan:
+    try:
+        artists, missing = await _refresh_catalog(session, playlist, progress)
+        progress.start("Selecting tracks")
+        now = utcnow()
+        plan = plan_rotation(session, playlist, artists, missing, now)
+        if dry_run:
             return plan
-        except Exception as error:
-            session.rollback()
-            if not dry_run:
-                playlist.last_error = str(error)
-                session.commit()
-            raise
+        if not plan.order:
+            raise ValueError("No eligible tracks to put in the playlist")
+        progress.start("Updating the Spotify playlist")
+        if not playlist.spotify_playlist_id:
+            playlist.spotify_playlist_id = await spotify.resolve_playlist(playlist.spotify_target)
+        await spotify.replace_playlist_items(playlist.spotify_playlist_id, [p.entry.track.uri for p in plan.order])
+        apply_rotation(session, playlist, plan, now)
+        session.commit()
+        log.info("Rotated %s with %d tracks", playlist.name, len(plan.order))
+        return plan
+    except Exception as error:
+        session.rollback()
+        if not dry_run:
+            playlist.last_error = str(error)
+            session.commit()
+        raise

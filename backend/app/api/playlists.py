@@ -8,9 +8,10 @@ from sqlalchemy.orm import Session
 from ..catalog import Entry, load_catalog
 from ..db import get_session
 from ..models import Album, DisabledAlbum, Playlist, PlaylistTrack, Rule, Track
-from ..rotation import Pick, refresh_catalog, rotate, rotation_lock
+from ..progress import running_jobs
+from ..rotation import Pick, refresh_catalog, rotate
 from ..schemas import (
-    AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary,
+    AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
     RotationOut, RuleIn, RuleOut, SelectionOut, ToggleIn, TrackOut,
 )
 from ..scheduler import next_rotation
@@ -190,8 +191,12 @@ def clear_cooldowns(playlist: Playlist = Depends(get_playlist), session: Session
 
 @router.post("/{playlist_id}/sync", status_code=204)
 async def sync_playlist(playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
-    async with rotation_lock:
-        await refresh_catalog(session, playlist)
+    await refresh_catalog(session, playlist)
+
+
+@router.get("/{playlist_id}/progress", response_model=ProgressOut | None)
+def read_progress(playlist_id: int):
+    return running_jobs.get(playlist_id)
 
 
 @router.post("/{playlist_id}/rotate", response_model=RotationOut)

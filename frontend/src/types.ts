@@ -112,6 +112,12 @@ export interface Rotation {
   order: Pick[];
 }
 
+export interface Progress {
+  step: string;
+  done: number;
+  total: number;
+}
+
 export interface AuthStatus {
   configured: boolean;
   authorize_url: string | null;
