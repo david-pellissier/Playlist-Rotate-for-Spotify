@@ -36,12 +36,12 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
   }
 
   async function toggleAlbum(album: CatalogAlbum) {
-    await action.run(() => api.toggleAlbum(playlistId, album.id, !album.disabled));
+    await action.run(() => api.setAlbumEnabled(playlistId, album.id, album.exclusion !== null));
     reload();
   }
 
   async function toggleTrack(track: CatalogTrack) {
-    await action.run(() => api.toggleTrack(playlistId, track.id, !track.disabled));
+    await action.run(() => api.setTrackEnabled(playlistId, track.id, track.exclusion !== null));
     reload();
   }
 
@@ -79,7 +79,7 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
       {catalog?.total_tracks === 0 && <div className="empty-state">No songs match these filters.</div>}
 
       {catalog?.albums.map((album) => (
-        <article key={album.id} className={album.disabled ? "album disabled" : "album"}>
+        <article key={album.id} className={album.exclusion ? "album disabled" : "album"}>
           <header className="album-header">
             {album.image_url
               ? <img className="album-cover" src={album.image_url} alt="" loading="lazy" />
@@ -88,9 +88,9 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
               <h3 title={album.name}>{album.name}</h3>
               <small>{album.artist_name} · {album.album_type} · {album.release_date}</small>
             </div>
-            {album.disabled && <span className="badge warning">Album disabled</span>}
+            <AlbumStatus album={album} />
             <button className="small" disabled={action.busy} onClick={() => toggleAlbum(album)}>
-              {album.disabled ? "Enable album" : "Disable album"}
+              {album.exclusion ? "Enable album" : "Disable album"}
             </button>
           </header>
           <div className="table-scroll">
@@ -103,9 +103,11 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
                     <td className="numeric muted" title="Times played">{track.play_count}×</td>
                     <td><TrackStatus track={track} /></td>
                     <td className="cell-actions">
-                      <button className="small ghost" disabled={action.busy} onClick={() => toggleTrack(track)}>
-                        {track.disabled ? "Enable" : "Disable"}
-                      </button>
+                      {track.excluded_by !== "album" && (
+                        <button className="small ghost" disabled={action.busy} onClick={() => toggleTrack(track)}>
+                          {track.exclusion ? "Enable" : "Disable"}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -140,10 +142,18 @@ function Pager({ catalog, onPage }: { catalog: Catalog; onPage: (page: number) =
   );
 }
 
+function AlbumStatus({ album }: { album: CatalogAlbum }) {
+  if (album.excluded_by === "auto") return <span className="badge warning">Excluded: {album.exclusion}</span>;
+  if (album.excluded_by === "user") return <span className="badge warning">Album disabled</span>;
+  if (album.forced) return <span className="badge info">Enabled manually</span>;
+  return null;
+}
+
 function TrackStatus({ track }: { track: CatalogTrack }) {
   if (track.exclusion) return <span className="badge">{track.exclusion}</span>;
   return (
     <span className="badges">
+      {track.forced && <span className="badge info">Enabled manually</span>}
       {track.new_release && <span className="badge info">New release</span>}
       {track.current && <span className="badge accent">In playlist</span>}
       {track.cooldown > 0 && <span className="badge warning">Cooldown {track.cooldown}</span>}

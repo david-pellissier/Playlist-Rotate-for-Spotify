@@ -4,9 +4,9 @@ from dataclasses import dataclass
 from datetime import date
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import InstrumentedAttribute, Session
 
-from .models import Album, DisabledAlbum, Playlist, PlaylistTrack, Rule, Track
+from .models import Album, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track
 
 ALBUM_TYPE_RANK = {"album": 0, "single": 1, "compilation": 2}
 FEATURING = re.compile(r"\s*[(\[](?:feat|ft|with)\b.*?[)\]]", re.IGNORECASE)
@@ -14,13 +14,43 @@ VERSION_SUFFIX = re.compile(r"\s+-\s+.*$")
 NON_WORD = re.compile(r"[\W_]+")
 
 
+USER = "user"
+AUTO = "auto"
+ALBUM = "album"
+
+
+@dataclass(slots=True)
+class Status:
+    automatic: str | None = None
+    exclusion: str | None = None
+    excluded_by: str | None = None
+    forced: bool = False
+
+    def exclude(self, reason: str, by: str) -> None:
+        self.exclusion = reason
+        self.excluded_by = by
+
+    def apply_automatic(self, forced: bool) -> None:
+        if not self.automatic or self.exclusion:
+            return
+        if forced:
+            self.forced = True
+        else:
+            self.exclude(self.automatic, AUTO)
+
+
 @dataclass(slots=True)
 class Entry:
     track: Track
     album: Album
+    album_status: Status
+    status: Status
     state: PlaylistTrack | None
     released: date
-    exclusion: str | None = None
+
+    @property
+    def exclusion(self) -> str | None:
+        return self.status.exclusion
 
     @property
     def eligible(self) -> bool:
@@ -65,15 +95,19 @@ def active_rules(session: Session, playlist: Playlist) -> list[Rule]:
     return [*global_rules, *playlist.rules]
 
 
+def album_rule_match(session: Session, playlist: Playlist, album: Album) -> str | None:
+    return RuleMatcher(active_rules(session, playlist)).match(album.name)
+
+
 def load_catalog(session: Session, playlist: Playlist, artist_ids: list[str]) -> dict[str, list[Entry]]:
     matcher = RuleMatcher(active_rules(session, playlist))
     states = {
         state.track_id: state
         for state in session.scalars(select(PlaylistTrack).where(PlaylistTrack.playlist_id == playlist.id))
     }
-    disabled_albums = set(session.scalars(
-        select(DisabledAlbum.album_id).where(DisabledAlbum.playlist_id == playlist.id)
-    ))
+    disabled_albums = _playlist_ids(session, DisabledAlbum.album_id, playlist.id)
+    enabled_albums = _playlist_ids(session, EnabledAlbum.album_id, playlist.id)
+    enabled_tracks = _playlist_ids(session, EnabledTrack.track_id, playlist.id)
     rows = session.execute(
         select(Track, Album)
         .join(Track.album)
@@ -82,24 +116,53 @@ def load_catalog(session: Session, playlist: Playlist, artist_ids: list[str]) ->
     )
 
     catalog: dict[str, list[Entry]] = {artist_id: [] for artist_id in artist_ids}
+    album_statuses: dict[str, Status] = {}
     for track, album in rows:
-        entry = Entry(track, album, states.get(track.id), album.release_date)
-        entry.exclusion = _exclusion(playlist, matcher, entry, album.id in disabled_albums)
-        catalog[album.artist_id].append(entry)
+        if album.id not in album_statuses:
+            album_statuses[album.id] = _album_status(matcher, album, disabled_albums, enabled_albums)
+        album_status = album_statuses[album.id]
+        state = states.get(track.id)
+        status = _track_status(playlist, matcher, track, album, state, album_status, track.id in enabled_tracks)
+        catalog[album.artist_id].append(Entry(track, album, album_status, status, state, album.release_date))
 
     if playlist.exclude_duplicates:
         for entries in catalog.values():
-            _mark_duplicates(entries)
+            _mark_duplicates(entries, enabled_tracks)
     return catalog
 
 
-def _exclusion(playlist: Playlist, matcher: RuleMatcher, entry: Entry, album_disabled: bool) -> str | None:
-    track, album = entry.track, entry.album
+def _playlist_ids(session: Session, column: InstrumentedAttribute[str], playlist_id: int) -> set[str]:
+    return set(session.scalars(select(column).where(column.class_.playlist_id == playlist_id)))
+
+
+def _album_status(matcher: RuleMatcher, album: Album, disabled: set[str], enabled: set[str]) -> Status:
+    status = Status(automatic=matcher.match(album.name))
+    if album.id in disabled:
+        status.exclude("album disabled", USER)
+    status.apply_automatic(forced=album.id in enabled)
+    return status
+
+
+def _track_status(
+    playlist: Playlist,
+    matcher: RuleMatcher,
+    track: Track,
+    album: Album,
+    state: PlaylistTrack | None,
+    album_status: Status,
+    forced: bool,
+) -> Status:
+    status = Status(automatic=_automatic_exclusion(playlist, matcher, track, album))
+    if album_status.exclusion:
+        status.exclude("album disabled" if album_status.excluded_by == USER else "album excluded", ALBUM)
+    elif state and state.disabled:
+        status.exclude("disabled", USER)
+    status.apply_automatic(forced)
+    return status
+
+
+def _automatic_exclusion(playlist: Playlist, matcher: RuleMatcher, track: Track, album: Album) -> str | None:
     seconds = track.duration_ms // 1000
-    if album_disabled:
-        return "album disabled"
-    if entry.state and entry.state.disabled:
-        return "disabled"
     if not track.artist_ids or track.artist_ids[0] != album.artist_id:
         return "guest appearance"
     if playlist.solo_only and len(track.artist_ids) > 1:
@@ -108,7 +171,7 @@ def _exclusion(playlist: Playlist, matcher: RuleMatcher, entry: Entry, album_dis
         return "too short"
     if playlist.max_duration and seconds > playlist.max_duration:
         return "too long"
-    return matcher.match(track.name) or matcher.match(album.name)
+    return matcher.match(track.name)
 
 
 def _title_key(track: Track) -> str:
@@ -116,7 +179,7 @@ def _title_key(track: Track) -> str:
     return NON_WORD.sub("", title.casefold()) or track.id
 
 
-def _mark_duplicates(entries: list[Entry]) -> None:
+def _mark_duplicates(entries: list[Entry], enabled_tracks: set[str]) -> None:
     groups: dict[str, list[Entry]] = defaultdict(list)
     for entry in entries:
         if entry.eligible:
@@ -133,5 +196,7 @@ def _mark_duplicates(entries: list[Entry]) -> None:
         ))
         keeper, *duplicates = group
         keeper.released = min(e.album.release_date for e in group)
+        reason = f'duplicate of "{keeper.track.name}" ({keeper.album.name})'
         for entry in duplicates:
-            entry.exclusion = f'duplicate of "{keeper.track.name}" ({keeper.album.name})'
+            entry.status.automatic = entry.status.automatic or reason
+            entry.status.apply_automatic(forced=entry.track.id in enabled_tracks)

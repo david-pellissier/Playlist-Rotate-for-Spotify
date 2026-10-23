@@ -155,6 +155,20 @@ class DisabledAlbum(Base):
     album_id: Mapped[str] = mapped_column(ForeignKey("albums.id", ondelete="CASCADE"), primary_key=True)
 
 
+class EnabledAlbum(Base):
+    __tablename__ = "enabled_albums"
+
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True)
+    album_id: Mapped[str] = mapped_column(ForeignKey("albums.id", ondelete="CASCADE"), primary_key=True)
+
+
+class EnabledTrack(Base):
+    __tablename__ = "enabled_tracks"
+
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True)
+    track_id: Mapped[str] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), primary_key=True)
+
+
 def init_db() -> None:
     Base.metadata.create_all(engine)
     with Session(engine) as session:

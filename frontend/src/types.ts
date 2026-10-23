@@ -56,14 +56,17 @@ export interface PlaylistSummary {
   last_error: string | null;
 }
 
+export type ExcludedBy = "user" | "auto" | "album" | null;
+
 export interface CatalogTrack {
   id: string;
   name: string;
   duration: number;
   released: string;
   exclusion: string | null;
+  excluded_by: ExcludedBy;
+  forced: boolean;
   new_release: boolean;
-  disabled: boolean;
   cooldown: number;
   current: boolean;
   play_count: number;
@@ -76,7 +79,9 @@ export interface CatalogAlbum {
   album_type: string;
   release_date: string;
   image_url: string | null;
-  disabled: boolean;
+  exclusion: string | null;
+  excluded_by: ExcludedBy;
+  forced: boolean;
   tracks: CatalogTrack[];
 }
 

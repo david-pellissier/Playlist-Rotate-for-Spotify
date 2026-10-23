@@ -53,10 +53,10 @@ export const api = {
     if (filters.artistId) params.set("artist_id", filters.artistId);
     return request<Catalog>(`/playlists/${id}/catalog?${params}`);
   },
-  toggleAlbum: (id: number, albumId: string, disabled: boolean) =>
-    request<void>(`/playlists/${id}/albums/${albumId}`, "PUT", { disabled }),
-  toggleTrack: (id: number, trackId: string, disabled: boolean) =>
-    request<void>(`/playlists/${id}/tracks/${trackId}`, "PUT", { disabled }),
+  setAlbumEnabled: (id: number, albumId: string, enabled: boolean) =>
+    request<void>(`/playlists/${id}/albums/${albumId}`, "PUT", { enabled }),
+  setTrackEnabled: (id: number, trackId: string, enabled: boolean) =>
+    request<void>(`/playlists/${id}/tracks/${trackId}`, "PUT", { enabled }),
   clearCooldowns: (id: number) => request<void>(`/playlists/${id}/clear-cooldowns`, "POST"),
   sync: (id: number) => request<void>(`/playlists/${id}/sync`, "POST"),
   progress: (id: number) => request<Progress | null>(`/playlists/${id}/progress`),

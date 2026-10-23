@@ -7,14 +7,14 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..catalog import Entry, load_catalog
+from ..catalog import Entry, album_rule_match, load_catalog
 from ..db import get_session
-from ..models import Album, DisabledAlbum, Playlist, PlaylistTrack, Rule, Track, utcnow
+from ..models import Album, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track, utcnow
 from ..progress import running_jobs
 from ..rotation import Pick, new_release_cutoff, refresh_catalog, rotate
 from ..schemas import (
     AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
-    RotationOut, RuleIn, RuleOut, SelectionOut, ToggleIn, TrackOut,
+    EnabledIn, RotationOut, RuleIn, RuleOut, SelectionOut, TrackOut,
 )
 from ..sync import known_artists
 
@@ -113,9 +113,6 @@ def read_catalog(
 ):
     artists, missing = known_artists(session, playlist.artist_names)
     catalog = load_catalog(session, playlist, [artist.id for artist in artists])
-    disabled_albums = set(session.scalars(
-        select(DisabledAlbum.album_id).where(DisabledAlbum.playlist_id == playlist.id)
-    ))
     names = {artist.id: artist.name for artist in artists}
     matches = STATUS_FILTERS[status]
     cutoff = new_release_cutoff(playlist, utcnow())
@@ -139,7 +136,9 @@ def read_catalog(
             album_type=entry.album.album_type,
             release_date=entry.album.release_date,
             image_url=entry.album.image_url,
-            disabled=entry.album.id in disabled_albums,
+            exclusion=entry.album_status.exclusion,
+            excluded_by=entry.album_status.excluded_by,
+            forced=entry.album_status.forced,
             tracks=[],
         ))
         album.tracks.append(track_out(entry, cutoff))
@@ -164,27 +163,50 @@ def read_catalog(
 
 
 @router.put("/{playlist_id}/albums/{album_id}", status_code=204)
-def toggle_album(album_id: str, data: ToggleIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
-    if session.get(Album, album_id) is None:
+def set_album_enabled(
+    album_id: str, data: EnabledIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)
+):
+    album = session.get(Album, album_id)
+    if album is None:
         raise HTTPException(404, "Album not found")
-    disabled = session.get(DisabledAlbum, (playlist.id, album_id))
-    if data.disabled and disabled is None:
+    key = (playlist.id, album_id)
+    delete_if_present(session, DisabledAlbum, key)
+    delete_if_present(session, EnabledAlbum, key)
+    excluded_by_rule = album_rule_match(session, playlist, album) is not None
+    if data.enabled and excluded_by_rule:
+        session.add(EnabledAlbum(playlist_id=playlist.id, album_id=album_id))
+    elif not data.enabled and not excluded_by_rule:
         session.add(DisabledAlbum(playlist_id=playlist.id, album_id=album_id))
-    elif not data.disabled and disabled is not None:
-        session.delete(disabled)
     session.commit()
 
 
 @router.put("/{playlist_id}/tracks/{track_id}", status_code=204)
-def toggle_track(track_id: str, data: ToggleIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
-    if session.get(Track, track_id) is None:
+def set_track_enabled(
+    track_id: str, data: EnabledIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)
+):
+    track = session.get(Track, track_id)
+    if track is None:
         raise HTTPException(404, "Track not found")
+    artist_id = track.album.artist_id
+    entry = next(e for e in load_catalog(session, playlist, [artist_id])[artist_id] if e.track.id == track_id)
+    excluded_automatically = entry.status.automatic is not None
+
     state = session.get(PlaylistTrack, (playlist.id, track_id))
     if state is None:
         state = PlaylistTrack(playlist_id=playlist.id, track_id=track_id, cooldown=0, current=False, play_count=0)
         session.add(state)
-    state.disabled = data.disabled
+    state.disabled = not data.enabled and not excluded_automatically
+
+    delete_if_present(session, EnabledTrack, (playlist.id, track_id))
+    if data.enabled and excluded_automatically:
+        session.add(EnabledTrack(playlist_id=playlist.id, track_id=track_id))
     session.commit()
+
+
+def delete_if_present(session: Session, model: type, key: tuple) -> None:
+    if row := session.get(model, key):
+        session.delete(row)
+        session.flush()
 
 
 @router.post("/{playlist_id}/clear-cooldowns", status_code=204)
@@ -238,7 +260,8 @@ def track_out(entry: Entry, cutoff: date) -> TrackOut:
         released=entry.released,
         exclusion=entry.exclusion,
         new_release=entry.is_new_release(cutoff),
-        disabled=bool(entry.state and entry.state.disabled),
+        excluded_by=entry.status.excluded_by,
+        forced=entry.status.forced,
         cooldown=entry.cooldown,
         current=entry.current,
         play_count=entry.play_count,

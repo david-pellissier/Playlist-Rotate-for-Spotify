@@ -92,14 +92,18 @@ class PlaylistSummary(Schema):
     last_error: str | None
 
 
+ExcludedBy = Literal["user", "auto", "album"] | None
+
+
 class TrackOut(BaseModel):
     id: str
     name: str
     duration: int
     released: date
     exclusion: str | None
+    excluded_by: ExcludedBy
+    forced: bool
     new_release: bool
-    disabled: bool
     cooldown: int
     current: bool
     play_count: int
@@ -112,7 +116,9 @@ class AlbumOut(BaseModel):
     album_type: str
     release_date: date
     image_url: str | None
-    disabled: bool
+    exclusion: str | None
+    excluded_by: ExcludedBy
+    forced: bool
     tracks: list[TrackOut]
 
 
@@ -133,8 +139,8 @@ class CatalogOut(BaseModel):
     page_size: int
 
 
-class ToggleIn(BaseModel):
-    disabled: bool
+class EnabledIn(BaseModel):
+    enabled: bool
 
 
 class PickOut(BaseModel):
