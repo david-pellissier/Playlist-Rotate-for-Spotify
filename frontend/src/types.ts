@@ -62,6 +62,7 @@ export interface CatalogTrack {
   duration: number;
   released: string;
   exclusion: string | null;
+  new_release: boolean;
   disabled: boolean;
   cooldown: number;
   current: boolean;
@@ -96,7 +97,7 @@ export interface Catalog {
   page_size: number;
 }
 
-export type CatalogStatus = "all" | "eligible" | "excluded" | "cooldown" | "current";
+export type CatalogStatus = "all" | "eligible" | "new" | "excluded" | "cooldown" | "current";
 
 export interface Pick {
   track_id: string;

@@ -7,6 +7,7 @@ import type { Catalog, CatalogAlbum, CatalogStatus, CatalogTrack } from "../type
 const STATUSES: Record<CatalogStatus, string> = {
   all: "All songs",
   eligible: "Eligible",
+  new: "New releases",
   excluded: "Excluded",
   cooldown: "On cooldown",
   current: "In playlist",
@@ -126,6 +127,7 @@ function TrackStatus({ track }: { track: CatalogTrack }) {
   if (track.exclusion) return <span className="muted">{track.exclusion}</span>;
   return (
     <>
+      {track.new_release && <span className="badge release">new release</span>}
       {track.current && <span className="badge current">in playlist</span>}
       {track.cooldown > 0 && <span className="badge cooldown">cooldown {track.cooldown}</span>}
       {!track.current && track.cooldown === 0 && <span className="badge new">eligible</span>}

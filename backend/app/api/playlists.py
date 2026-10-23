@@ -1,4 +1,5 @@
 import math
+from datetime import date
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,9 +9,9 @@ from sqlalchemy.orm import Session
 
 from ..catalog import Entry, load_catalog
 from ..db import get_session
-from ..models import Album, DisabledAlbum, Playlist, PlaylistTrack, Rule, Track
+from ..models import Album, DisabledAlbum, Playlist, PlaylistTrack, Rule, Track, utcnow
 from ..progress import running_jobs
-from ..rotation import Pick, refresh_catalog, rotate
+from ..rotation import Pick, new_release_cutoff, refresh_catalog, rotate
 from ..schemas import (
     AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
     RotationOut, RuleIn, RuleOut, SelectionOut, ToggleIn, TrackOut,
@@ -21,11 +22,12 @@ router = APIRouter(prefix="/api/playlists")
 
 CATALOG_PAGE_SIZE = 250
 STATUS_FILTERS = {
-    "all": lambda e: True,
-    "eligible": lambda e: e.eligible,
-    "excluded": lambda e: not e.eligible,
-    "cooldown": lambda e: e.cooldown > 0,
-    "current": lambda e: e.current,
+    "all": lambda e, cutoff: True,
+    "eligible": lambda e, cutoff: e.eligible,
+    "new": lambda e, cutoff: e.is_new_release(cutoff),
+    "excluded": lambda e, cutoff: not e.eligible,
+    "cooldown": lambda e, cutoff: e.cooldown > 0,
+    "current": lambda e, cutoff: e.current,
 }
 
 
@@ -104,7 +106,7 @@ def create_playlist_rule(data: RuleIn, playlist: Playlist = Depends(get_playlist
 def read_catalog(
     artist_id: str | None = None,
     q: str = "",
-    status: Literal["all", "eligible", "excluded", "cooldown", "current"] = "all",
+    status: Literal["all", "eligible", "new", "excluded", "cooldown", "current"] = "all",
     page: int = Query(1, ge=1),
     playlist: Playlist = Depends(get_playlist),
     session: Session = Depends(get_session),
@@ -116,13 +118,14 @@ def read_catalog(
     ))
     names = {artist.id: artist.name for artist in artists}
     matches = STATUS_FILTERS[status]
+    cutoff = new_release_cutoff(playlist, utcnow())
     query = q.strip().casefold()
 
     selected = [
         entry
         for current_artist in ([artist_id] if artist_id else names)
         for entry in catalog.get(current_artist, [])
-        if matches(entry) and matches_query(entry, query)
+        if matches(entry, cutoff) and matches_query(entry, query)
     ]
     page = min(page, max(1, math.ceil(len(selected) / CATALOG_PAGE_SIZE)))
     start = (page - 1) * CATALOG_PAGE_SIZE
@@ -139,7 +142,7 @@ def read_catalog(
             disabled=entry.album.id in disabled_albums,
             tracks=[],
         ))
-        album.tracks.append(track_out(entry))
+        album.tracks.append(track_out(entry, cutoff))
 
     return CatalogOut(
         artists=[
@@ -227,13 +230,14 @@ def matches_query(entry: Entry, query: str) -> bool:
     return not query or query in entry.track.name.casefold() or query in entry.album.name.casefold()
 
 
-def track_out(entry: Entry) -> TrackOut:
+def track_out(entry: Entry, cutoff: date) -> TrackOut:
     return TrackOut(
         id=entry.track.id,
         name=entry.track.name,
         duration=entry.track.duration_ms // 1000,
         released=entry.released,
         exclusion=entry.exclusion,
+        new_release=entry.is_new_release(cutoff),
         disabled=bool(entry.state and entry.state.disabled),
         cooldown=entry.cooldown,
         current=entry.current,

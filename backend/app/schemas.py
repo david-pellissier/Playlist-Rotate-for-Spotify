@@ -98,6 +98,7 @@ class TrackOut(BaseModel):
     duration: int
     released: date
     exclusion: str | None
+    new_release: bool
     disabled: bool
     cooldown: int
     current: bool

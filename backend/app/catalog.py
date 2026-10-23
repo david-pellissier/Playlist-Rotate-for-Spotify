@@ -42,6 +42,9 @@ class Entry:
     def available(self) -> bool:
         return self.eligible and self.cooldown == 0
 
+    def is_new_release(self, cutoff: date) -> bool:
+        return self.eligible and self.play_count == 0 and self.released >= cutoff
+
 
 class RuleMatcher:
     def __init__(self, rules: list[Rule]) -> None:

@@ -460,3 +460,15 @@ ul.plain {
 .modal p {
   margin: 0;
 }
+
+.badge.release {
+  background: #e3ecff;
+  color: #1d4ed8;
+}
+
+@media (prefers-color-scheme: dark) {
+  .badge.release {
+    background: #1e2a4a;
+    color: #9dbbff;
+  }
+}

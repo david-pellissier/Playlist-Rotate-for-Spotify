@@ -56,7 +56,7 @@ def select_tracks(entries: list[Entry], count: int, max_new: int, cutoff: date) 
     available = [e for e in eligible if e.available]
 
     new = sorted(
-        (e for e in available if e.released >= cutoff and e.play_count == 0),
+        (e for e in available if e.is_new_release(cutoff)),
         key=lambda e: e.released,
         reverse=True,
     )
