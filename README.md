@@ -2,8 +2,12 @@
 
 Keeps Spotify playlists fresh by rotating songs from a list of artists. Every artist gets the same number
 of songs, new releases are prioritized, and played songs go on cooldown until the artist's catalog has cycled.
-A local web manager lets you configure playlists, browse the cached catalog, disable albums or songs and
-preview rotations.
+It runs as two containers:
+
+- **daemon:** runs 24/7. It owns the database, talks to Spotify, rotates playlists on schedule and serves the
+  API. It publishes no port.
+- **web:** an nginx container serving the manager UI and forwarding `/api` to the daemon. Start it when you
+  want to change something and stop it afterwards. Scheduled rotations don't need it.
 
 ## How it works
 
@@ -32,20 +36,48 @@ preview rotations.
 1. Create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and add
    `http://127.0.0.1:8000/api/auth/callback` as a redirect URI.
 2. Copy `.env.example` to `.env` and fill in `SPOTIFY_CLIENT_ID` and `SPOTIFY_CLIENT_SECRET`.
-3. Start the app:
+3. Start the daemon and the web manager:
 
    ```bash
-   docker compose up -d --build
+   docker compose --profile ui up -d --build
    ```
 
 4. Open <http://127.0.0.1:8000/settings>, click **Authorize with Spotify**, put the displayed
-   `SPOTIFY_REFRESH_TOKEN` in `.env` and restart:
+   `SPOTIFY_REFRESH_TOKEN` in `.env` and restart the daemon:
 
    ```bash
-   docker compose up -d
+   docker compose up -d daemon
    ```
 
-The database lives in `./data/spotify.db`.
+The database lives in `./data/spotify.db`. Don't open it in another program while the daemon is running.
+
+## Daily use
+
+The daemon starts with `docker compose up -d` and comes back after a reboot. To use the manager:
+
+```bash
+docker compose --profile ui up -d web
+```
+
+When you're done:
+
+```bash
+docker compose stop web
+```
+
+## Deploying on a server
+
+- Spotify only accepts `http` redirect URIs on `127.0.0.1`. Do the authorization once on your own computer
+  as described above, then copy the `.env` values to the server.
+- Set `WEB_BIND` to the address the manager should listen on, e.g. your VPN interface IP. The manager has no
+  login, so never expose it publicly.
+- Failures are only reported in the daemon's logs, and in the playlist page's "Last rotation failed" message.
+  A failed scheduled rotation is retried an hour later, up to `SCHEDULER_MAX_RETRIES` times. After that it
+  waits for the next scheduled rotation. Container logs are capped at 3 files of 5 MB each.
+
+  ```bash
+  docker compose logs daemon
+  ```
 
 ## Web manager
 
@@ -69,6 +101,9 @@ The database lives in `./data/spotify.db`.
 | `SPOTIFY_REDIRECT_URI` | `http://127.0.0.1:8000/api/auth/callback` | Must match the app settings |
 | `TZ` | `UTC` | Timezone of the playlists' rotation times, e.g. `Europe/Zurich` |
 | `SCHEDULER_POLL_SECONDS` | `60` | How often due playlists are checked |
+| `SCHEDULER_MAX_RETRIES` | `1` | Hourly retries of a failed scheduled rotation before waiting for the next one |
+| `WEB_BIND` | `127.0.0.1` | Address the web manager listens on |
+| `WEB_PORT` | `8000` | Port the web manager listens on |
 | `DATABASE_PATH` | `/data/spotify.db` | SQLite file |
 
 ## Development

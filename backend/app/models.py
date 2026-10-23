@@ -102,9 +102,12 @@ class Playlist(Base):
 
     @property
     def next_rotation_at(self) -> datetime:
+        return self.next_rotation_after(self.last_rotated_at)
+
+    def next_rotation_after(self, moment: datetime | None) -> datetime:
         day = self.first_rotation_date
-        if self.last_rotated_at:
-            last_day = self.last_rotated_at.replace(tzinfo=UTC).astimezone(env.timezone).date()
+        if moment:
+            last_day = moment.replace(tzinfo=UTC).astimezone(env.timezone).date()
             if last_day >= day:
                 periods = (last_day - day).days // self.update_interval_days + 1
                 day += timedelta(days=periods * self.update_interval_days)

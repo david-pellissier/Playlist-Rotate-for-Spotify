@@ -1,10 +1,28 @@
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 5m
+    max-file: "3"
+
 services:
-  playlist-rotate:
-    build: .
-    container_name: playlist-rotate
+  daemon:
+    build:
+      context: .
+      target: daemon
+    container_name: playlist-rotate-daemon
     env_file: .env
-    ports:
-      - "127.0.0.1:8000:8000"
     volumes:
       - ./data:/data
     restart: unless-stopped
+    logging: *logging
+
+  web:
+    build:
+      context: .
+      target: web
+    container_name: playlist-rotate-web
+    profiles: [ui]
+    depends_on: [daemon]
+    ports:
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8000}:80"
+    logging: *logging

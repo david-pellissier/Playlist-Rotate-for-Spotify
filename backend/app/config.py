@@ -11,8 +11,8 @@ class Env:
     refresh_token: str
     redirect_uri: str
     database_path: Path
-    frontend_dist: Path
     scheduler_poll_seconds: int
+    scheduler_max_retries: int
     timezone: ZoneInfo
 
 
@@ -22,7 +22,7 @@ env = Env(
     refresh_token=os.getenv("SPOTIFY_REFRESH_TOKEN", ""),
     redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/api/auth/callback"),
     database_path=Path(os.getenv("DATABASE_PATH", "data/spotify.db")),
-    frontend_dist=Path(os.getenv("FRONTEND_DIST", "../frontend/dist")),
     scheduler_poll_seconds=int(os.getenv("SCHEDULER_POLL_SECONDS", "60")),
+    scheduler_max_retries=int(os.getenv("SCHEDULER_MAX_RETRIES", "1")),
     timezone=ZoneInfo(os.getenv("TZ") or "UTC"),
 )

@@ -4,11 +4,9 @@ import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 
 from .api import playlists, settings, transfer
-from .config import env
 from .models import init_db
 from .scheduler import run_scheduler
 from .spotify import SpotifyError, spotify
@@ -42,15 +40,3 @@ async def spotify_error(_: Request, error: SpotifyError):
 @app.exception_handler(ValueError)
 async def value_error(_: Request, error: ValueError):
     return JSONResponse({"detail": str(error)}, status_code=400)
-
-
-if env.frontend_dist.is_dir():
-    dist = env.frontend_dist.resolve()
-    app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
-
-    @app.get("/{path:path}", include_in_schema=False)
-    async def spa(path: str):
-        file = (dist / path).resolve()
-        if file.is_file() and file.is_relative_to(dist):
-            return FileResponse(file)
-        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
