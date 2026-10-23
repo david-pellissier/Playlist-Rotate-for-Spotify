@@ -383,3 +383,55 @@ ul.plain {
   width: 100%;
   accent-color: var(--accent);
 }
+
+.badge.paused {
+  background: var(--warning-bg);
+  font-weight: 600;
+}
+
+.banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.segmented label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.segmented input {
+  width: auto;
+  grid-row: span 2;
+  margin: 2px 0 0;
+}
+
+.segmented label.selected {
+  border-color: var(--accent);
+  background: var(--success-bg);
+}
+
+.segmented label.selected.paused {
+  border-color: #d9a400;
+  background: var(--warning-bg);
+}

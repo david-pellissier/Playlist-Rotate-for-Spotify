@@ -39,6 +39,11 @@ export default function PlaylistPage() {
     setCatalogVersion((v) => v + 1);
   }
 
+  async function resumeSchedule() {
+    await action.run(() => api.updatePlaylist(id, { ...playlist!, enabled: true }));
+    reload();
+  }
+
   async function clearCooldowns() {
     if (!confirm("Reset the cooldown of every song in this playlist?")) return;
     await action.run(() => api.clearCooldowns(id));
@@ -55,7 +60,7 @@ export default function PlaylistPage() {
           <h1>{playlist.name}</h1>
           <p className="muted">
             {playlist.spotify_target} · {playlist.artist_names.length} artists · {playlist.songs_per_artist} songs each ·
-            every {playlist.update_interval_days} d at {playlist.rotation_time} · last rotation {formatDate(playlist.last_rotated_at)}
+            last rotation {formatDate(playlist.last_rotated_at)}
           </p>
         </div>
         <div className="actions">
@@ -66,6 +71,18 @@ export default function PlaylistPage() {
           <button className="primary" disabled={working} onClick={() => rotate(false)}>Rotate now</button>
         </div>
       </div>
+
+      {playlist.enabled ? (
+        <p className="muted">
+          Next rotation {formatDate(playlist.next_rotation_at)}, then every {playlist.update_interval_days} d at{" "}
+          {playlist.rotation_time}.
+        </p>
+      ) : (
+        <div className="notice banner">
+          <span><strong>Paused.</strong> This playlist only rotates when you click "Rotate now".</span>
+          <button disabled={working} onClick={resumeSchedule}>Resume schedule</button>
+        </div>
+      )}
 
       {progress ? <JobProgress progress={progress} /> : action.busy && <p className="muted">Working…</p>}
       {action.error && <p className="error">{action.error}</p>}

@@ -1,6 +1,5 @@
 import asyncio
 import logging
-from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -12,21 +11,11 @@ from .rotation import rotate
 log = logging.getLogger(__name__)
 
 
-def next_rotation(playlist: Playlist) -> datetime:
-    if playlist.last_rotated_at:
-        last_rotation = playlist.last_rotated_at.replace(tzinfo=UTC).astimezone(env.timezone)
-        day = last_rotation.date() + timedelta(days=playlist.update_interval_days)
-    else:
-        day = datetime.now(env.timezone).date()
-    scheduled = datetime.combine(day, playlist.rotation_time, env.timezone)
-    return scheduled.astimezone(UTC).replace(tzinfo=None)
-
-
 async def rotate_due_playlists() -> None:
     with SessionLocal() as session:
         now = utcnow()
         for playlist in session.scalars(select(Playlist).where(Playlist.enabled)).all():
-            if next_rotation(playlist) > now:
+            if playlist.next_rotation_at > now:
                 continue
             try:
                 await rotate(session, playlist, dry_run=False)

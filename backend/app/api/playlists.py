@@ -14,7 +14,6 @@ from ..schemas import (
     AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
     RotationOut, RuleIn, RuleOut, SelectionOut, ToggleIn, TrackOut,
 )
-from ..scheduler import next_rotation
 from ..sync import known_artists
 
 router = APIRouter(prefix="/api/playlists")
@@ -56,7 +55,7 @@ def list_playlists(session: Session = Depends(get_session)):
             update_interval_days=p.update_interval_days,
             rotation_time=p.rotation_time,
             last_rotated_at=p.last_rotated_at,
-            next_rotation_at=next_rotation(p),
+            next_rotation_at=p.next_rotation_at,
             last_error=p.last_error,
         )
         for p in session.scalars(select(Playlist).order_by(Playlist.name))

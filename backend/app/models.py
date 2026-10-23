@@ -1,8 +1,9 @@
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
+from .config import env
 from .db import Base, engine
 
 DEFAULT_KEYWORDS = (
@@ -80,6 +81,7 @@ class Playlist(Base):
     songs_per_artist: Mapped[int] = mapped_column(default=3)
     max_new_releases: Mapped[int] = mapped_column(default=1)
     update_interval_days: Mapped[int] = mapped_column(default=7)
+    first_rotation_date: Mapped[date]
     rotation_time: Mapped[time] = mapped_column(default=time(6))
     shuffle: Mapped[bool] = mapped_column(default=True)
     enabled: Mapped[bool] = mapped_column(default=True)
@@ -97,6 +99,17 @@ class Playlist(Base):
     def artist_names(self) -> list[str]:
         lines = (line.strip() for line in self.artists.splitlines())
         return list(dict.fromkeys(line for line in lines if line and not line.startswith("#")))
+
+    @property
+    def next_rotation_at(self) -> datetime:
+        day = self.first_rotation_date
+        if self.last_rotated_at:
+            last_day = self.last_rotated_at.replace(tzinfo=UTC).astimezone(env.timezone).date()
+            if last_day >= day:
+                periods = (last_day - day).days // self.update_interval_days + 1
+                day += timedelta(days=periods * self.update_interval_days)
+        scheduled = datetime.combine(day, self.rotation_time, env.timezone)
+        return scheduled.astimezone(UTC).replace(tzinfo=None)
 
 
 class Rule(Base):

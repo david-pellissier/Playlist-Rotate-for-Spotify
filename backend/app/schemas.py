@@ -47,6 +47,7 @@ class PlaylistIn(Schema):
     songs_per_artist: int = Field(ge=1)
     max_new_releases: int = Field(ge=0)
     update_interval_days: int = Field(ge=1)
+    first_rotation_date: date
     rotation_time: ClockTime
     shuffle: bool
     enabled: bool
@@ -62,6 +63,7 @@ class PlaylistOut(PlaylistIn):
     artist_names: list[str]
     spotify_playlist_id: str | None
     last_rotated_at: UtcDatetime | None
+    next_rotation_at: UtcDatetime
     last_error: str | None
     rules: list[RuleOut]
 

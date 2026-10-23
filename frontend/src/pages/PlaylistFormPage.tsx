@@ -2,7 +2,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Checkbox, NumberField } from "../components/Fields";
+import ScheduleFields from "../components/ScheduleFields";
 import RuleList from "../components/RuleList";
+import { todayIso } from "../format";
 import { useAction, useLoader } from "../hooks";
 import type { Playlist, PlaylistInput, Rule, Settings } from "../types";
 
@@ -14,6 +16,7 @@ function defaults(settings: Settings): PlaylistInput {
     songs_per_artist: 3,
     max_new_releases: 1,
     update_interval_days: 7,
+    first_rotation_date: todayIso(),
     rotation_time: "06:00",
     shuffle: true,
     enabled: true,
@@ -94,17 +97,13 @@ export default function PlaylistFormPage() {
         </label>
       </fieldset>
 
+      <ScheduleFields form={form} isNew={!id} onChange={set} />
+
       <fieldset className="grid">
         <legend>Rotation</legend>
         <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
         <NumberField label="Max new releases per artist" min={0} value={form.max_new_releases} onChange={(v) => set("max_new_releases", v as number)} />
-        <NumberField label="Update interval (days)" min={1} value={form.update_interval_days} onChange={(v) => set("update_interval_days", v as number)} />
-        <label>
-          Rotation time
-          <input type="time" required value={form.rotation_time} onChange={(e) => set("rotation_time", e.target.value)} />
-        </label>
         <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
-        <Checkbox label="Scheduled rotation enabled" checked={form.enabled} onChange={(v) => set("enabled", v)} />
       </fieldset>
 
       <fieldset className="grid">

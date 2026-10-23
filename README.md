@@ -23,9 +23,9 @@ preview rotations.
    short, songs closest to the end of their cooldown fill the gap, so every artist has the same count.
 4. **Cooldown:** a picked song sits out the next `max(min cooldown, eligible songs / songs per artist - 1)`
    rotations, so an artist's whole catalog cycles before a song repeats. Cooldowns are per playlist.
-5. **Schedule:** each playlist rotates at its rotation time (in `TZ`), every *update interval* days counted from
-   the day of its last rotation. A rotation made by hand moves the next one accordingly. A new playlist rotates
-   at the next occurrence of its rotation time, or right away if that time has already passed today.
+5. **Schedule:** an active playlist first rotates on its first rotation date at its rotation time (in `TZ`), then
+   every *N* days at the same time. Rotating by hand doesn't move the schedule. A paused playlist keeps its
+   schedule but only rotates when you click "Rotate now".
 
 ## Setup
 

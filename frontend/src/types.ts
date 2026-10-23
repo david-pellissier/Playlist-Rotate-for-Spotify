@@ -22,6 +22,7 @@ export interface PlaylistInput {
   songs_per_artist: number;
   max_new_releases: number;
   update_interval_days: number;
+  first_rotation_date: string;
   rotation_time: string;
   shuffle: boolean;
   enabled: boolean;
@@ -37,6 +38,7 @@ export interface Playlist extends PlaylistInput {
   artist_names: string[];
   spotify_playlist_id: string | null;
   last_rotated_at: string | null;
+  next_rotation_at: string;
   last_error: string | null;
   rules: Rule[];
 }

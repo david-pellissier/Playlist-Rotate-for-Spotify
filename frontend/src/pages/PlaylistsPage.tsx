@@ -39,14 +39,14 @@ export default function PlaylistsPage() {
               <tr key={p.id}>
                 <td>
                   <Link to={`/playlists/${p.id}`}>{p.name}</Link>
-                  {!p.enabled && <span className="badge">paused</span>}
+                  {!p.enabled && <span className="badge paused">paused</span>}
                   {p.last_error && <span className="badge danger" title={p.last_error}>error</span>}
                 </td>
                 <td className="muted">{p.spotify_target}</td>
                 <td>{p.artist_count}</td>
                 <td>{p.update_interval_days} d at {p.rotation_time}</td>
                 <td>{formatDate(p.last_rotated_at)}</td>
-                <td>{p.enabled ? formatDate(p.next_rotation_at) : "—"}</td>
+                <td>{p.enabled ? formatDate(p.next_rotation_at) : <span className="muted">paused</span>}</td>
                 <td className="actions">
                   <Link className="button" to={`/playlists/${p.id}/edit`}>Edit</Link>
                   <button className="danger" disabled={action.busy} onClick={() => remove(p.id, p.name)}>Delete</button>
