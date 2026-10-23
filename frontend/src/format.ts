@@ -14,3 +14,7 @@ export function formatDay(value: string): string {
 export function formatDate(value: string | null): string {
   return value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—";
 }
+
+export function formatSchedule(intervalDays: number, time: string): string {
+  return `${intervalDays === 1 ? "Every day" : `Every ${intervalDays} days`} at ${time}`;
+}

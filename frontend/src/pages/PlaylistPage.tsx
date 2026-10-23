@@ -3,8 +3,10 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import CatalogView from "../components/CatalogView";
 import JobProgress, { useJobProgress } from "../components/JobProgress";
+import Menu from "../components/Menu";
+import PlaylistStatus from "../components/PlaylistStatus";
 import RotationView from "../components/RotationView";
-import { formatDate } from "../format";
+import { formatDate, formatSchedule } from "../format";
 import { useAction, useLoader } from "../hooks";
 import type { Rotation } from "../types";
 
@@ -56,48 +58,80 @@ export default function PlaylistPage() {
   return (
     <section className="stack">
       <div className="page-header">
-        <div>
-          <h1>{playlist.name}</h1>
-          <p className="muted">
-            {playlist.spotify_target} · {playlist.artist_names.length} artists · {playlist.songs_per_artist} songs each ·
-            last rotation {formatDate(playlist.last_rotated_at)}
-          </p>
+        <div className="page-title">
+          <Link to="/" className="back-link">← Playlists</Link>
+          <h1>
+            {playlist.name}
+            <PlaylistStatus enabled={playlist.enabled} error={playlist.last_error} />
+          </h1>
+          <p className="muted">{playlist.spotify_target}</p>
         </div>
         <div className="actions">
           <Link className="button" to={`/playlists/${id}/edit`}>Edit</Link>
-          <a className="button" href={api.exportUrl(id)} download>Export</a>
-          <button disabled={working} onClick={refresh}>Refresh catalog</button>
-          <button disabled={working} onClick={clearCooldowns}>Clear cooldowns</button>
+          <Menu label="More">
+            <button disabled={working} onClick={refresh}>Refresh catalog</button>
+            <button disabled={working} onClick={clearCooldowns}>Clear cooldowns</button>
+            <a className="button" href={api.exportUrl(id)} download>Export configuration</a>
+          </Menu>
           <button disabled={working} onClick={() => rotate(true)}>Dry run</button>
           <button className="primary" disabled={working} onClick={() => rotate(false)}>Rotate now</button>
         </div>
       </div>
 
-      {playlist.enabled ? (
-        <p className="muted">
-          Next rotation {formatDate(playlist.next_rotation_at)}, then every {playlist.update_interval_days} d at{" "}
-          {playlist.rotation_time}.
-        </p>
-      ) : (
+      <div className="stats">
+        <Stat label="Next rotation" value={playlist.enabled ? formatDate(playlist.next_rotation_at) : "Paused"} />
+        <Stat label="Schedule" value={formatSchedule(playlist.update_interval_days, playlist.rotation_time)} />
+        <Stat
+          label="Songs per rotation"
+          value={String(playlist.artist_names.length * playlist.songs_per_artist)}
+          hint={`${playlist.artist_names.length} artists × ${playlist.songs_per_artist}`}
+        />
+        <Stat label="Last rotation" value={formatDate(playlist.last_rotated_at)} />
+      </div>
+
+      {!playlist.enabled && (
         <div className="notice banner">
           <span><strong>Paused.</strong> This playlist only rotates when you click "Rotate now".</span>
-          <button disabled={working} onClick={resumeSchedule}>Resume schedule</button>
+          <button className="small" disabled={working} onClick={resumeSchedule}>Resume schedule</button>
         </div>
       )}
-
       {progress ? <JobProgress progress={progress} /> : action.busy && <p className="muted">Working…</p>}
       {action.error && <p className="error">{action.error}</p>}
-      {playlist.last_error && <p className="error">Last rotation failed: {playlist.last_error}</p>}
+      {playlist.last_error && <p className="error"><strong>Last rotation failed:</strong> {playlist.last_error}</p>}
 
-      <div className="tabs">
-        <button className={tab === "songs" ? "active" : ""} onClick={() => setTab("songs")}>Songs</button>
-        <button className={tab === "rotation" ? "active" : ""} onClick={() => setTab("rotation")}>Rotation</button>
+      <div className="tabs" role="tablist">
+        <TabButton active={tab === "songs"} onClick={() => setTab("songs")}>Songs</TabButton>
+        <TabButton active={tab === "rotation"} onClick={() => setTab("rotation")}>Rotation preview</TabButton>
       </div>
 
       {tab === "songs" && <CatalogView playlistId={id} version={catalogVersion} />}
       {tab === "rotation" && (rotation
         ? <RotationView rotation={rotation} />
-        : <p className="muted">Run a dry run to preview the next rotation.</p>)}
+        : (
+          <div className="empty-state">
+            <h2>No preview yet</h2>
+            <p>A dry run shows which songs the next rotation would pick, without changing anything.</p>
+            <button disabled={working} onClick={() => rotate(true)}>Run a dry run</button>
+          </div>
+        ))}
     </section>
+  );
+}
+
+function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+  return (
+    <div className="stat">
+      <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
+      {hint && <small>{hint}</small>}
+    </div>
+  );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
+  return (
+    <button role="tab" aria-selected={active} className={active ? "active" : ""} onClick={onClick}>
+      {children}
+    </button>
   );
 }

@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api } from "../api";
 import { Checkbox, NumberField } from "../components/Fields";
+import Panel from "../components/Panel";
 import RuleList from "../components/RuleList";
 import { useAction, useLoader } from "../hooks";
 import type { Settings } from "../types";
@@ -29,54 +30,63 @@ export default function SettingsPage() {
 
   return (
     <section className="stack">
-      <h1>Settings</h1>
+      <div className="page-header">
+        <div className="page-title">
+          <h1>Settings</h1>
+          <p className="muted">Spotify connection, defaults and rules shared by all playlists.</p>
+        </div>
+      </div>
 
-      <fieldset>
-        <legend>Spotify</legend>
+      <Panel title="Spotify">
         {auth.configured ? (
-          <p className="success">Credentials are configured.</p>
+          <div className="row">
+            <span className="badge success dot">Connected</span>
+            <span className="muted">Credentials are set in the environment.</span>
+          </div>
         ) : auth.authorize_url ? (
-          <p>
-            No refresh token yet. <a href={auth.authorize_url}>Authorize with Spotify</a> and copy the token shown
-            into your <code>.env</code> file, then restart.
-          </p>
+          <div className="banner">
+            <span>
+              <span className="badge warning dot">Not connected</span>{" "}
+              Authorize once, then copy the token shown into your <code>.env</code> file and restart the daemon.
+            </span>
+            <a className="button primary" href={auth.authorize_url}>Authorize with Spotify</a>
+          </div>
         ) : (
           <p className="error">Set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET in your <code>.env</code> file.</p>
         )}
-      </fieldset>
+      </Panel>
 
-      <form className="stack" onSubmit={submit}>
-        <fieldset className="grid">
-          <legend>Defaults</legend>
-          <NumberField label="Minimum cooldown (rotations)" min={0} value={form.min_cooldown} onChange={(v) => set("min_cooldown", v as number)} />
-          <NumberField
-            label="Catalog refresh lookback (days)"
-            min={0}
-            value={form.refresh_lookback_days}
-            onChange={(v) => set("refresh_lookback_days", v as number)}
-          />
-          <NumberField label="Min duration (s)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
-          <NumberField
-            label="Max duration (s, empty = none)"
-            min={1}
-            optional
-            value={form.max_duration}
-            onChange={(v) => set("max_duration", v)}
-          />
-          <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
-          <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
-          <small>Duration, featuring and duplicate defaults apply to newly created playlists.</small>
-        </fieldset>
-        <div className="actions">
-          {save.error && <span className="error">{save.error}</span>}
-          {saved && <span className="success">Saved</span>}
-          <button className="primary" disabled={save.busy}>Save defaults</button>
-        </div>
+      <form onSubmit={submit}>
+        <Panel title="Defaults" description="Duration, featuring and duplicate settings are copied into new playlists.">
+          <div className="field-grid">
+            <NumberField label="Minimum cooldown (rotations)" min={0} value={form.min_cooldown} onChange={(v) => set("min_cooldown", v as number)} />
+            <NumberField
+              label="Catalog refresh lookback (days)"
+              min={0}
+              value={form.refresh_lookback_days}
+              onChange={(v) => set("refresh_lookback_days", v as number)}
+            />
+            <NumberField label="Min duration (seconds)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
+            <NumberField
+              label="Max duration (seconds)"
+              min={1}
+              optional
+              placeholder="No limit"
+              value={form.max_duration}
+              onChange={(v) => set("max_duration", v)}
+            />
+            <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
+            <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
+          </div>
+          <div className="actions">
+            {save.error && <span className="error">{save.error}</span>}
+            {saved && <span className="success">Saved</span>}
+            <button className="primary" disabled={save.busy}>Save defaults</button>
+          </div>
+        </Panel>
       </form>
 
-      <fieldset>
-        <legend>Global rules</legend>
-        <p className="muted">Applied to the track and album titles of every playlist, unless the playlist disables them.</p>
+      <Panel title="Global rules" description="Matched against song and album titles in every playlist, unless a playlist turns them off.">
         <RuleList
           rules={rules}
           onCreate={async (kind, pattern) => {
@@ -88,7 +98,7 @@ export default function SettingsPage() {
             setData((current) => current && [current[0], current[1].filter((r) => r.id !== id), current[2]]);
           }}
         />
-      </fieldset>
+      </Panel>
     </section>
   );
 }

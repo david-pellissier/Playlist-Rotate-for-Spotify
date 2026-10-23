@@ -1,7 +1,8 @@
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImportPlaylist from "../components/ImportPlaylist";
-import { formatDate } from "../format";
+import PlaylistStatus from "../components/PlaylistStatus";
+import { formatDate, formatSchedule } from "../format";
 import { useAction, useLoader } from "../hooks";
 
 export default function PlaylistsPage() {
@@ -16,50 +17,68 @@ export default function PlaylistsPage() {
   }
 
   return (
-    <section>
+    <section className="stack">
       <div className="page-header">
-        <h1>Playlists</h1>
+        <div className="page-title">
+          <h1>Playlists</h1>
+          <p className="muted">Each playlist rotates songs from its artists on its own schedule.</p>
+        </div>
         <div className="actions">
           <ImportPlaylist onImported={(playlist) => navigate(`/playlists/${playlist.id}`)} />
           <Link className="button primary" to="/playlists/new">New playlist</Link>
         </div>
       </div>
+
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
-      {playlists?.length === 0 && <p className="muted">No playlist configured yet.</p>}
+      {!playlists && !error && <p className="muted">Loading…</p>}
+
+      {playlists?.length === 0 && (
+        <div className="empty-state">
+          <h2>No playlists yet</h2>
+          <p>Create one from scratch or import an exported configuration.</p>
+          <Link className="button primary" to="/playlists/new">New playlist</Link>
+        </div>
+      )}
+
       {!!playlists?.length && (
-        <table>
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Spotify playlist</th>
-              <th>Artists</th>
-              <th>Every</th>
-              <th>Last rotation</th>
-              <th>Next rotation</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {playlists.map((p) => (
-              <tr key={p.id}>
-                <td>
-                  <Link to={`/playlists/${p.id}`}>{p.name}</Link>
-                  {!p.enabled && <span className="badge paused">paused</span>}
-                  {p.last_error && <span className="badge danger" title={p.last_error}>error</span>}
-                </td>
-                <td className="muted">{p.spotify_target}</td>
-                <td>{p.artist_count}</td>
-                <td>{p.update_interval_days} d at {p.rotation_time}</td>
-                <td>{formatDate(p.last_rotated_at)}</td>
-                <td>{p.enabled ? formatDate(p.next_rotation_at) : <span className="muted">paused</span>}</td>
-                <td className="actions">
-                  <Link className="button" to={`/playlists/${p.id}/edit`}>Edit</Link>
-                  <button className="danger" disabled={action.busy} onClick={() => remove(p.id, p.name)}>Delete</button>
-                </td>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Playlist</th>
+                <th>Status</th>
+                <th className="numeric hide-sm">Artists</th>
+                <th className="hide-sm">Schedule</th>
+                <th className="hide-sm">Last rotation</th>
+                <th className="hide-sm">Next rotation</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {playlists.map((p) => (
+                <tr key={p.id}>
+                  <td>
+                    <div className="cell-title">
+                      <Link to={`/playlists/${p.id}`}>{p.name}</Link>
+                      <small>{p.spotify_target}</small>
+                    </div>
+                  </td>
+                  <td><PlaylistStatus enabled={p.enabled} error={p.last_error} /></td>
+                  <td className="numeric hide-sm">{p.artist_count}</td>
+                  <td className="nowrap hide-sm">{formatSchedule(p.update_interval_days, p.rotation_time)}</td>
+                  <td className="nowrap hide-sm">{formatDate(p.last_rotated_at)}</td>
+                  <td className="nowrap hide-sm">{p.enabled ? formatDate(p.next_rotation_at) : <span className="muted">—</span>}</td>
+                  <td className="cell-actions">
+                    <Link className="button small" to={`/playlists/${p.id}/edit`}>Edit</Link>
+                    <button className="small danger" disabled={action.busy} onClick={() => remove(p.id, p.name)}>
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

@@ -1,18 +1,16 @@
-import { formatDay, todayIso } from "../format";
+import { formatDay, formatSchedule, todayIso } from "../format";
 import type { PlaylistInput } from "../types";
 import { NumberField } from "./Fields";
+import Panel from "./Panel";
 
 export default function ScheduleFields({ form, isNew, onChange }: {
   form: PlaylistInput;
   isNew: boolean;
   onChange: <K extends keyof PlaylistInput>(key: K, value: PlaylistInput[K]) => void;
 }) {
-  const every = form.update_interval_days === 1 ? "every day" : `every ${form.update_interval_days} days`;
-
   return (
-    <fieldset>
-      <legend>Schedule</legend>
-      <div className="segmented" role="radiogroup">
+    <Panel title="Schedule" description="When the playlist rotates on its own.">
+      <div className="segmented" role="radiogroup" aria-label="Schedule">
         <label className={form.enabled ? "selected" : ""}>
           <input type="radio" name="schedule" checked={form.enabled} onChange={() => onChange("enabled", true)} />
           <strong>Active</strong>
@@ -46,13 +44,14 @@ export default function ScheduleFields({ form, isNew, onChange }: {
           onChange={(v) => onChange("update_interval_days", v as number)}
         />
       </div>
-      {form.first_rotation_date && (
+      {form.first_rotation_date && form.update_interval_days > 0 && (
         <p className={form.enabled ? "muted" : "notice"}>
-          {!form.enabled && "Paused: this schedule is kept but not used. "}
-          Starting {formatDay(form.first_rotation_date)} at {form.rotation_time}, then {every} at the same time.
-          Rotating by hand does not move this schedule.
+          {!form.enabled && <strong>Paused: this schedule is kept but not used. </strong>}
+          First rotation on {formatDay(form.first_rotation_date)} at {form.rotation_time}, then{" "}
+          {formatSchedule(form.update_interval_days, form.rotation_time).toLowerCase()}. Rotating by hand doesn't move
+          this schedule.
         </p>
       )}
-    </fieldset>
+    </Panel>
   );
 }

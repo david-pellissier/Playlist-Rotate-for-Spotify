@@ -41,11 +41,11 @@ export default function JobProgress({ progress }: { progress: Progress }) {
   const percent = progress.total ? Math.round((progress.done / progress.total) * 100) : undefined;
   return (
     <div className="job-progress">
-      <div className="inline">
+      <div className="job-progress-label">
         <span>{progress.step}…</span>
         {progress.total > 0 && (
           <span className="muted">
-            {progress.done} / {progress.total} ({percent}%)
+            {progress.done} / {progress.total} · {percent}%
           </span>
         )}
       </div>

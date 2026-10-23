@@ -51,7 +51,7 @@ export default function ImportPlaylist({ onImported }: { onImported: (playlist: 
     <>
       <input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={readFile} />
       <button disabled={action.busy} onClick={() => fileInput.current?.click()}>Import</button>
-      {action.error && <p className="error">{action.error}</p>}
+      {action.error && <span className="error">{action.error}</span>}
       {conflict && (
         <div className="modal-backdrop">
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="import-conflict-title">

@@ -1,9 +1,10 @@
 import { FormEvent, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Checkbox, NumberField } from "../components/Fields";
-import ScheduleFields from "../components/ScheduleFields";
+import Panel from "../components/Panel";
 import RuleList from "../components/RuleList";
+import ScheduleFields from "../components/ScheduleFields";
 import { todayIso } from "../format";
 import { useAction, useLoader } from "../hooks";
 import type { Playlist, PlaylistInput, Rule, Settings } from "../types";
@@ -39,6 +40,7 @@ export default function PlaylistFormPage() {
   const [form, setForm] = useState<PlaylistInput>();
   const [playlistRules, setPlaylistRules] = useState<Rule[]>([]);
   const save = useAction();
+  const backTo = id ? `/playlists/${id}` : "/";
 
   useEffect(() => {
     if (!data) return;
@@ -71,73 +73,75 @@ export default function PlaylistFormPage() {
   return (
     <form className="stack" onSubmit={submit}>
       <div className="page-header">
-        <h1>{id ? `Edit ${(data[2] as Playlist).name}` : "New playlist"}</h1>
-        <div className="actions">
-          <button type="button" onClick={() => navigate(id ? `/playlists/${id}` : "/")}>Cancel</button>
-          <button className="primary" disabled={save.busy}>Save</button>
+        <div className="page-title">
+          <Link to={backTo} className="back-link">← {id ? (data[2] as Playlist).name : "Playlists"}</Link>
+          <h1>{id ? "Edit playlist" : "New playlist"}</h1>
         </div>
       </div>
-      {save.error && <p className="error">{save.error}</p>}
 
-      <fieldset>
-        <legend>General</legend>
+      <Panel title="General" description="Which Spotify playlist to fill, and with which artists.">
+        <div className="field-grid">
+          <label>
+            Name
+            <input required value={form.name} onChange={(e) => set("name", e.target.value)} />
+          </label>
+          <label>
+            Spotify playlist
+            <input required value={form.spotify_target} onChange={(e) => set("spotify_target", e.target.value)} />
+            <small>Name, ID or URL. A playlist with this name is created if you don't own one yet.</small>
+          </label>
+        </div>
         <label>
-          Name
-          <input required value={form.name} onChange={(e) => set("name", e.target.value)} />
-        </label>
-        <label>
-          Spotify playlist (name, ID or URL)
-          <input required value={form.spotify_target} onChange={(e) => set("spotify_target", e.target.value)} />
-          <small>A playlist with this name is created if none exists.</small>
-        </label>
-        <label>
-          Artists (one per line, exact Spotify name)
+          Artists
           <textarea rows={12} value={form.artists} onChange={(e) => set("artists", e.target.value)} />
-          <small>Empty lines and lines starting with # are ignored.</small>
+          <small>One per line, with the exact Spotify name. Empty lines and lines starting with # are ignored.</small>
         </label>
-      </fieldset>
+      </Panel>
 
       <ScheduleFields form={form} isNew={!id} onChange={set} />
 
-      <fieldset className="grid">
-        <legend>Rotation</legend>
+      <Panel title="Rotation" description="How many songs each artist gets in every rotation." grid>
         <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
-        <NumberField label="Max new releases per artist" min={0} value={form.max_new_releases} onChange={(v) => set("max_new_releases", v as number)} />
-        <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
-      </fieldset>
-
-      <fieldset className="grid">
-        <legend>Filters</legend>
-        <NumberField label="Min duration (s)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
         <NumberField
-          label="Max duration (s, empty = none)"
+          label="Max new releases per artist"
+          min={0}
+          value={form.max_new_releases}
+          onChange={(v) => set("max_new_releases", v as number)}
+        />
+        <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
+      </Panel>
+
+      <Panel title="Filters" description="Songs that don't pass these filters are never picked." grid>
+        <NumberField label="Min duration (seconds)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
+        <NumberField
+          label="Max duration (seconds)"
           min={1}
           value={form.max_duration}
           onChange={(v) => set("max_duration", v)}
           optional
+          placeholder="No limit"
         />
         <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
         <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
-      </fieldset>
+      </Panel>
 
-      <fieldset>
-        <legend>Global rules</legend>
+      <Panel title="Global rules" description="Click a rule to turn it off for this playlist. Manage the list in Settings.">
         <div className="chips">
-          {globalRules.map((rule) => (
-            <label key={rule.id} className="chip">
-              <input
-                type="checkbox"
-                checked={!form.disabled_rule_ids.includes(rule.id)}
-                onChange={(e) => toggleRule(rule.id, e.target.checked)}
-              />
-              <span className="muted">{rule.kind === "regex" ? "regex" : ""}</span> {rule.pattern}
-            </label>
-          ))}
+          {globalRules.map((rule) => {
+            const enabled = !form.disabled_rule_ids.includes(rule.id);
+            return (
+              <label key={rule.id} className={enabled ? "chip on" : "chip"}>
+                <input type="checkbox" checked={enabled} onChange={(e) => toggleRule(rule.id, e.target.checked)} />
+                {rule.kind === "regex" && <span className="chip-kind">regex</span>}
+                {rule.pattern}
+              </label>
+            );
+          })}
+          {globalRules.length === 0 && <span className="muted">No global rules.</span>}
         </div>
-      </fieldset>
+      </Panel>
 
-      <fieldset>
-        <legend>Playlist rules</legend>
+      <Panel title="Playlist rules" description="Extra keywords or regexes that only apply to this playlist. Saved immediately.">
         {id ? (
           <RuleList
             rules={playlistRules}
@@ -153,7 +157,13 @@ export default function PlaylistFormPage() {
         ) : (
           <p className="muted">Save the playlist first to add its own rules.</p>
         )}
-      </fieldset>
+      </Panel>
+
+      <div className="form-footer">
+        {save.error && <span className="error">{save.error}</span>}
+        <Link className="button" to={backTo}>Cancel</Link>
+        <button className="primary" disabled={save.busy}>{id ? "Save changes" : "Create playlist"}</button>
+      </div>
     </form>
   );
 }

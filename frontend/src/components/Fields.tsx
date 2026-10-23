@@ -3,6 +3,7 @@ export function NumberField(props: {
   value: number | null;
   min: number;
   optional?: boolean;
+  placeholder?: string;
   onChange: (value: number | null) => void;
 }) {
   return (
@@ -12,6 +13,7 @@ export function NumberField(props: {
         type="number"
         min={props.min}
         required={!props.optional}
+        placeholder={props.placeholder}
         value={props.value ?? ""}
         onChange={(e) => props.onChange(e.target.value === "" ? null : Number(e.target.value))}
       />

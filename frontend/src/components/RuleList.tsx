@@ -10,7 +10,6 @@ export default function RuleList(props: {
   const [kind, setKind] = useState<RuleKind>("keyword");
   const [pattern, setPattern] = useState("");
   const action = useAction();
-
   const canAdd = pattern.trim() !== "" && !action.busy;
 
   async function add(event: SyntheticEvent) {
@@ -25,24 +24,31 @@ export default function RuleList(props: {
 
   return (
     <div className="stack">
-      {action.error && <p className="error">{action.error}</p>}
       <div className="chips">
         {props.rules.map((rule) => (
           <span key={rule.id} className="chip">
-            {rule.kind === "regex" && <span className="muted">regex</span>} {rule.pattern}
-            <button type="button" className="link" title="Remove" onClick={() => action.run(() => props.onDelete(rule.id))}>
+            {rule.kind === "regex" && <span className="chip-kind">regex</span>}
+            {rule.pattern}
+            <button
+              type="button"
+              aria-label={`Remove ${rule.pattern}`}
+              title="Remove"
+              disabled={action.busy}
+              onClick={() => action.run(() => props.onDelete(rule.id))}
+            >
               ×
             </button>
           </span>
         ))}
-        {props.rules.length === 0 && <span className="muted">No rules.</span>}
+        {props.rules.length === 0 && <span className="muted">No rules yet.</span>}
       </div>
-      <div className="inline">
-        <select value={kind} onChange={(e) => setKind(e.target.value as RuleKind)}>
+      <div className="rule-form">
+        <select aria-label="Rule type" value={kind} onChange={(e) => setKind(e.target.value as RuleKind)}>
           <option value="keyword">Keyword</option>
           <option value="regex">Regex</option>
         </select>
         <input
+          aria-label="Rule"
           placeholder={kind === "keyword" ? "e.g. karaoke" : "e.g. pt\\.? ?\\d+"}
           value={pattern}
           onChange={(e) => setPattern(e.target.value)}
@@ -50,6 +56,7 @@ export default function RuleList(props: {
         />
         <button type="button" disabled={!canAdd} onClick={add}>Add rule</button>
       </div>
+      {action.error && <p className="error">{action.error}</p>}
     </div>
   );
 }
