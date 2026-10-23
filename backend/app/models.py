@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 
 from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
@@ -80,6 +80,7 @@ class Playlist(Base):
     songs_per_artist: Mapped[int] = mapped_column(default=3)
     max_new_releases: Mapped[int] = mapped_column(default=1)
     update_interval_days: Mapped[int] = mapped_column(default=7)
+    rotation_time: Mapped[time] = mapped_column(default=time(6))
     shuffle: Mapped[bool] = mapped_column(default=True)
     enabled: Mapped[bool] = mapped_column(default=True)
     min_duration: Mapped[int] = mapped_column(default=100)

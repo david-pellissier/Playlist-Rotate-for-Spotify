@@ -22,6 +22,7 @@ export interface PlaylistInput {
   songs_per_artist: number;
   max_new_releases: number;
   update_interval_days: number;
+  rotation_time: string;
   shuffle: boolean;
   enabled: boolean;
   min_duration: number;
@@ -47,8 +48,9 @@ export interface PlaylistSummary {
   artist_count: number;
   enabled: boolean;
   update_interval_days: number;
+  rotation_time: string;
   last_rotated_at: string | null;
-  next_rotation_at: string | null;
+  next_rotation_at: string;
   last_error: string | null;
 }
 

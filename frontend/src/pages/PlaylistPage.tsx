@@ -49,7 +49,7 @@ export default function PlaylistPage() {
           <h1>{playlist.name}</h1>
           <p className="muted">
             {playlist.spotify_target} · {playlist.artist_names.length} artists · {playlist.songs_per_artist} songs each ·
-            every {playlist.update_interval_days} d · last rotation {formatDate(playlist.last_rotated_at)}
+            every {playlist.update_interval_days} d at {playlist.rotation_time} · last rotation {formatDate(playlist.last_rotated_at)}
           </p>
         </div>
         <div className="actions">

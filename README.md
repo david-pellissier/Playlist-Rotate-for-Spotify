@@ -23,7 +23,9 @@ preview rotations.
    short, songs closest to the end of their cooldown fill the gap, so every artist has the same count.
 4. **Cooldown:** a picked song sits out the next `max(min cooldown, eligible songs / songs per artist - 1)`
    rotations, so an artist's whole catalog cycles before a song repeats. Cooldowns are per playlist.
-5. **Schedule:** the container checks every 10 minutes for enabled playlists whose update interval has elapsed.
+5. **Schedule:** each playlist rotates at its rotation time (in `TZ`), every *update interval* days counted from
+   the day of its last rotation. A rotation made by hand moves the next one accordingly. A new playlist rotates
+   at the next occurrence of its rotation time, or right away if that time has already passed today.
 
 ## Setup
 
@@ -63,7 +65,8 @@ The database lives in `./data/spotify.db`.
 | `SPOTIFY_CLIENT_SECRET` | | Spotify app client secret |
 | `SPOTIFY_REFRESH_TOKEN` | | Obtained once through the Settings page |
 | `SPOTIFY_REDIRECT_URI` | `http://127.0.0.1:8000/api/auth/callback` | Must match the app settings |
-| `SCHEDULER_POLL_SECONDS` | `600` | How often due playlists are checked |
+| `TZ` | `UTC` | Timezone of the playlists' rotation times, e.g. `Europe/Zurich` |
+| `SCHEDULER_POLL_SECONDS` | `60` | How often due playlists are checked |
 | `DATABASE_PATH` | `/data/spotify.db` | SQLite file |
 
 ## Development

@@ -1,10 +1,11 @@
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer, field_validator
 
-UtcDatetime = Annotated[datetime, PlainSerializer(lambda value: value.replace(tzinfo=UTC).isoformat())]
+UtcDatetime = Annotated[datetime, PlainSerializer(lambda value: value.replace(tzinfo=UTC).isoformat(), when_used="json")]
+ClockTime = Annotated[time, PlainSerializer(lambda value: value.strftime("%H:%M"), when_used="json")]
 
 
 class Schema(BaseModel):
@@ -46,6 +47,7 @@ class PlaylistIn(Schema):
     songs_per_artist: int = Field(ge=1)
     max_new_releases: int = Field(ge=0)
     update_interval_days: int = Field(ge=1)
+    rotation_time: ClockTime
     shuffle: bool
     enabled: bool
     min_duration: int = Field(ge=0)
@@ -71,8 +73,9 @@ class PlaylistSummary(Schema):
     artist_count: int
     enabled: bool
     update_interval_days: int
+    rotation_time: ClockTime
     last_rotated_at: UtcDatetime | None
-    next_rotation_at: UtcDatetime | None
+    next_rotation_at: UtcDatetime
     last_error: str | None
 
 

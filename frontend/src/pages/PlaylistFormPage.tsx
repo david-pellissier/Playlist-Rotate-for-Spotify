@@ -14,6 +14,7 @@ function defaults(settings: Settings): PlaylistInput {
     songs_per_artist: 3,
     max_new_releases: 1,
     update_interval_days: 7,
+    rotation_time: "06:00",
     shuffle: true,
     enabled: true,
     min_duration: settings.min_duration,
@@ -98,6 +99,10 @@ export default function PlaylistFormPage() {
         <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
         <NumberField label="Max new releases per artist" min={0} value={form.max_new_releases} onChange={(v) => set("max_new_releases", v as number)} />
         <NumberField label="Update interval (days)" min={1} value={form.update_interval_days} onChange={(v) => set("update_interval_days", v as number)} />
+        <label>
+          Rotation time
+          <input type="time" required value={form.rotation_time} onChange={(e) => set("rotation_time", e.target.value)} />
+        </label>
         <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
         <Checkbox label="Scheduled rotation enabled" checked={form.enabled} onChange={(v) => set("enabled", v)} />
       </fieldset>

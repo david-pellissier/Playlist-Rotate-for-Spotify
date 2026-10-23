@@ -44,7 +44,7 @@ export default function PlaylistsPage() {
                 </td>
                 <td className="muted">{p.spotify_target}</td>
                 <td>{p.artist_count}</td>
-                <td>{p.update_interval_days} d</td>
+                <td>{p.update_interval_days} d at {p.rotation_time}</td>
                 <td>{formatDate(p.last_rotated_at)}</td>
                 <td>{p.enabled ? formatDate(p.next_rotation_at) : "—"}</td>
                 <td className="actions">

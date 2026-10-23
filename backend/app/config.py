@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 
 @dataclass(frozen=True, slots=True)
@@ -12,6 +13,7 @@ class Env:
     database_path: Path
     frontend_dist: Path
     scheduler_poll_seconds: int
+    timezone: ZoneInfo
 
 
 env = Env(
@@ -21,5 +23,6 @@ env = Env(
     redirect_uri=os.getenv("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/api/auth/callback"),
     database_path=Path(os.getenv("DATABASE_PATH", "data/spotify.db")),
     frontend_dist=Path(os.getenv("FRONTEND_DIST", "../frontend/dist")),
-    scheduler_poll_seconds=int(os.getenv("SCHEDULER_POLL_SECONDS", "600")),
+    scheduler_poll_seconds=int(os.getenv("SCHEDULER_POLL_SECONDS", "60")),
+    timezone=ZoneInfo(os.getenv("TZ") or "UTC"),
 )
