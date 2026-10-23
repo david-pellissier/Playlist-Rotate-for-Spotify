@@ -10,7 +10,7 @@ function defaults(settings: Settings): PlaylistInput {
   return {
     name: "",
     spotify_target: "",
-    artist_names: [],
+    artists: "",
     songs_per_artist: 3,
     max_new_releases: 1,
     update_interval_days: 7,
@@ -33,7 +33,6 @@ export default function PlaylistFormPage() {
     [id],
   );
   const [form, setForm] = useState<PlaylistInput>();
-  const [artists, setArtists] = useState("");
   const [playlistRules, setPlaylistRules] = useState<Rule[]>([]);
   const save = useAction();
 
@@ -41,7 +40,6 @@ export default function PlaylistFormPage() {
     if (!data) return;
     const [settings, , playlist] = data;
     setForm(playlist ?? defaults(settings));
-    setArtists((playlist?.artist_names ?? []).join("\n"));
     setPlaylistRules(playlist?.rules ?? []);
   }, [data]);
 
@@ -62,8 +60,7 @@ export default function PlaylistFormPage() {
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    const payload = { ...form!, artist_names: artists.split("\n") };
-    const saved = await save.run(() => (id ? api.updatePlaylist(id, payload) : api.createPlaylist(payload)));
+    const saved = await save.run(() => (id ? api.updatePlaylist(id, form!) : api.createPlaylist(form!)));
     if (saved) navigate(`/playlists/${saved.id}`);
   }
 
@@ -91,7 +88,8 @@ export default function PlaylistFormPage() {
         </label>
         <label>
           Artists (one per line, exact Spotify name)
-          <textarea rows={8} value={artists} onChange={(e) => setArtists(e.target.value)} />
+          <textarea rows={12} value={form.artists} onChange={(e) => set("artists", e.target.value)} />
+          <small>Empty lines and lines starting with # are ignored.</small>
         </label>
       </fieldset>
 

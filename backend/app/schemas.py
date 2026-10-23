@@ -42,7 +42,7 @@ class RuleOut(RuleIn):
 class PlaylistIn(Schema):
     name: str = Field(min_length=1)
     spotify_target: str = Field(min_length=1)
-    artist_names: list[str]
+    artists: str
     songs_per_artist: int = Field(ge=1)
     max_new_releases: int = Field(ge=0)
     update_interval_days: int = Field(ge=1)
@@ -54,14 +54,10 @@ class PlaylistIn(Schema):
     exclude_duplicates: bool
     disabled_rule_ids: list[int]
 
-    @field_validator("artist_names")
-    @classmethod
-    def clean_names(cls, names: list[str]) -> list[str]:
-        return list(dict.fromkeys(name.strip() for name in names if name.strip()))
-
 
 class PlaylistOut(PlaylistIn):
     id: int
+    artist_names: list[str]
     spotify_playlist_id: str | None
     last_rotated_at: UtcDatetime | None
     last_error: str | None

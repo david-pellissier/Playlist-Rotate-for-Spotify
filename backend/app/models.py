@@ -1,6 +1,6 @@
 from datetime import UTC, date, datetime
 
-from sqlalchemy import JSON, ForeignKey, String
+from sqlalchemy import JSON, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .db import Base, engine
@@ -76,7 +76,7 @@ class Playlist(Base):
     name: Mapped[str] = mapped_column(unique=True)
     spotify_target: Mapped[str]
     spotify_playlist_id: Mapped[str | None]
-    artist_names: Mapped[list[str]] = mapped_column(JSON, default=list)
+    artists: Mapped[str] = mapped_column(Text, default="")
     songs_per_artist: Mapped[int] = mapped_column(default=3)
     max_new_releases: Mapped[int] = mapped_column(default=1)
     update_interval_days: Mapped[int] = mapped_column(default=7)
@@ -91,6 +91,11 @@ class Playlist(Base):
     last_error: Mapped[str | None]
 
     rules: Mapped[list["Rule"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+
+    @property
+    def artist_names(self) -> list[str]:
+        lines = (line.strip() for line in self.artists.splitlines())
+        return list(dict.fromkeys(line for line in lines if line and not line.startswith("#")))
 
 
 class Rule(Base):

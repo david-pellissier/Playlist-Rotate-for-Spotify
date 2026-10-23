@@ -50,4 +50,6 @@ if env.frontend_dist.is_dir():
     @app.get("/{path:path}", include_in_schema=False)
     async def spa(path: str):
         file = (dist / path).resolve()
-        return FileResponse(file if file.is_file() and file.is_relative_to(dist) else dist / "index.html")
+        if file.is_file() and file.is_relative_to(dist):
+            return FileResponse(file)
+        return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})

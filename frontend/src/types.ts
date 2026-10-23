@@ -18,7 +18,7 @@ export interface Settings {
 export interface PlaylistInput {
   name: string;
   spotify_target: string;
-  artist_names: string[];
+  artists: string;
   songs_per_artist: number;
   max_new_releases: number;
   update_interval_days: number;
@@ -33,6 +33,7 @@ export interface PlaylistInput {
 
 export interface Playlist extends PlaylistInput {
   id: number;
+  artist_names: string[];
   spotify_playlist_id: string | null;
   last_rotated_at: string | null;
   last_error: string | null;
