@@ -713,7 +713,7 @@ span.success:not(.badge) {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(150px, 190px) 1fr;
+  grid-template-columns: minmax(180px, 260px) minmax(150px, 190px) 1fr auto;
   gap: 8px;
 }
 
@@ -1321,5 +1321,83 @@ tbody tr.history-detail:hover td {
     content: "";
     position: absolute;
     inset: -12px;
+  }
+}
+
+.artist-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.artist-section + .artist-section {
+  margin-top: 14px;
+}
+
+.artist-header {
+  position: sticky;
+  top: 56px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 0;
+  border-bottom: 2px solid var(--border-strong);
+  background: var(--bg);
+}
+
+.artist-header h2 {
+  font-size: 18px;
+}
+
+.toggle {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+}
+
+.toggle svg {
+  transition: transform 0.15s;
+}
+
+.toggle.open svg {
+  transform: rotate(90deg);
+}
+
+.album-header.collapsed {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-bottom: none;
+}
+
+.album-header.collapsed .album-cover {
+  width: 32px;
+  height: 32px;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .toggle {
+    width: 38px;
+    height: 38px;
+  }
+}
+
+@media (max-width: 720px) {
+  .album-header {
+    gap: 6px 10px;
+  }
+
+  .album-info {
+    flex-basis: calc(100% - 110px);
+  }
+
+  .album-header > button {
+    margin-left: auto;
   }
 }

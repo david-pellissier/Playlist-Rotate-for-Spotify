@@ -26,6 +26,22 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
   );
   const action = useAction();
 
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const albumKeys = catalog?.albums.map((album) => `album:${album.id}`) ?? [];
+  const allCollapsed = albumKeys.length > 0 && albumKeys.every((key) => collapsed.has(key));
+
+  function toggle(key: string) {
+    setCollapsed((current) => {
+      const next = new Set(current);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setCollapsed(allCollapsed ? new Set() : new Set(albumKeys));
+  }
+
   function filter(apply: () => void) {
     apply();
     setPage(1);
@@ -67,6 +83,7 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
           value={search}
           onChange={(e) => filter(() => setSearch(e.target.value))}
         />
+        <button disabled={!albumKeys.length} onClick={toggleAll}>{allCollapsed ? "Expand all" : "Collapse all"}</button>
       </div>
 
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
@@ -79,47 +96,110 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
       {catalog && catalog.total_tracks > 0 && <Pager catalog={catalog} onPage={setPage} />}
       {catalog?.total_tracks === 0 && <div className="empty-state">No songs match these filters.</div>}
 
-      {catalog?.albums.map((album) => (
-        <article key={album.id} className={album.exclusion ? "album disabled" : "album"}>
-          <header className="album-header">
-            {album.image_url
-              ? <img className="album-cover" src={album.image_url} alt="" loading="lazy" />
-              : <span className="album-cover" />}
-            <div className="album-info">
-              <h3 title={album.name}>{album.name}</h3>
-              <small>{album.artist_name} · {album.album_type} · {album.release_date}</small>
-            </div>
-            <AlbumStatus album={album} />
-            <button className="small" disabled={action.busy} onClick={() => toggleAlbum(album)}>
-              {album.exclusion ? "Enable album" : "Disable album"}
-            </button>
-          </header>
-          <div className="table-scroll">
-            <table>
-              <tbody>
-                {album.tracks.map((track) => (
-                  <tr key={track.id} className={track.exclusion ? "excluded" : undefined}>
-                    <td className="track-name">{track.name}</td>
-                    <td className="numeric muted">{formatDuration(track.duration)}</td>
-                    <td className="numeric muted" title="Times played">{track.play_count}×</td>
-                    <td><TrackStatus track={track} /></td>
-                    <td className="cell-actions">
-                      {track.excluded_by !== "album" && (
-                        <button className="small ghost" disabled={action.busy} onClick={() => toggleTrack(track)}>
-                          {track.exclusion ? "Enable" : "Disable"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </article>
-      ))}
+      {groupByArtist(catalog?.albums ?? []).map(([artistName, albums]) => {
+        const artist = catalog?.artists.find((a) => a.name === artistName);
+        const open = !collapsed.has(`artist:${artistName}`);
+        return (
+          <section key={artistName} className="artist-section">
+            <header className="artist-header">
+              <Toggle open={open} label={artistName} onClick={() => toggle(`artist:${artistName}`)} />
+              <h2>{artistName}</h2>
+              {artist && <small>{artist.eligible}/{artist.total} eligible · {artist.on_cooldown} on cooldown</small>}
+            </header>
+            {open && albums.map((album) => (
+              <AlbumCard
+                key={album.id}
+                album={album}
+                open={!collapsed.has(`album:${album.id}`)}
+                busy={action.busy}
+                onToggleOpen={() => toggle(`album:${album.id}`)}
+                onToggleAlbum={() => toggleAlbum(album)}
+                onToggleTrack={toggleTrack}
+              />
+            ))}
+          </section>
+        );
+      })}
 
       {catalog && catalog.total_tracks > catalog.page_size && <Pager catalog={catalog} onPage={goTo} />}
     </div>
+  );
+}
+
+function groupByArtist(albums: CatalogAlbum[]): [string, CatalogAlbum[]][] {
+  const groups = new Map<string, CatalogAlbum[]>();
+  for (const album of albums) groups.set(album.artist_name, [...(groups.get(album.artist_name) ?? []), album]);
+  return [...groups];
+}
+
+function Toggle({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      className={open ? "toggle open" : "toggle"}
+      aria-expanded={open}
+      aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
+      title={open ? "Collapse" : "Expand"}
+      onClick={onClick}
+    >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <path d="m9 6 6 6-6 6" />
+      </svg>
+    </button>
+  );
+}
+
+function AlbumCard({ album, open, busy, onToggleOpen, onToggleAlbum, onToggleTrack }: {
+  album: CatalogAlbum;
+  open: boolean;
+  busy: boolean;
+  onToggleOpen: () => void;
+  onToggleAlbum: () => void;
+  onToggleTrack: (track: CatalogTrack) => void;
+}) {
+  const eligible = album.tracks.filter((track) => !track.exclusion).length;
+  return (
+    <article className={album.exclusion ? "album disabled" : "album"}>
+      <header className={open ? "album-header" : "album-header collapsed"}>
+        <Toggle open={open} label={album.name} onClick={onToggleOpen} />
+        {album.image_url
+          ? <img className="album-cover" src={album.image_url} alt="" loading="lazy" />
+          : <span className="album-cover" />}
+        <div className="album-info">
+          <h3 title={album.name}>{album.name}</h3>
+          <small>
+            {album.album_type} · {album.release_date} · {album.tracks.length} {album.tracks.length === 1 ? "song" : "songs"},{" "}
+            {eligible} eligible
+          </small>
+        </div>
+        <AlbumStatus album={album} />
+        <button className="small" disabled={busy} onClick={onToggleAlbum}>
+          {album.exclusion ? "Enable album" : "Disable album"}
+        </button>
+      </header>
+      {open && (
+        <div className="table-scroll">
+          <table>
+            <tbody>
+              {album.tracks.map((track) => (
+                <tr key={track.id} className={track.exclusion ? "excluded" : undefined}>
+                  <td className="track-name">{track.name}</td>
+                  <td className="numeric muted">{formatDuration(track.duration)}</td>
+                  <td className="numeric muted" title="Times played">{track.play_count}×</td>
+                  <td><TrackStatus track={track} /></td>
+                  <td className="cell-actions">
+                    {track.excluded_by !== "album" && (
+                      <button className="small ghost" disabled={busy} onClick={() => onToggleTrack(track)}>
+                        {track.exclusion ? "Enable" : "Disable"}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
   );
 }
 
