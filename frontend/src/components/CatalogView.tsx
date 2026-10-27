@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { formatDuration } from "../format";
+import InfoTip from "./InfoTip";
 import { useAction, useDebounced, useLoader } from "../hooks";
 import type { Catalog, CatalogAlbum, CatalogStatus, CatalogTrack } from "../types";
 
@@ -71,8 +72,8 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
       {!!catalog?.missing_artists.length && (
         <p className="notice">
-          <strong>Not in the catalog yet:</strong> {catalog.missing_artists.join(", ")}. Refresh the catalog, or check
-          that the names exactly match Spotify.
+          <strong>Not found:</strong> {catalog.missing_artists.join(", ")}
+          <InfoTip text="Refresh the catalog, or check that the names exactly match Spotify." />
         </p>
       )}
       {catalog && catalog.total_tracks > 0 && <Pager catalog={catalog} onPage={setPage} />}

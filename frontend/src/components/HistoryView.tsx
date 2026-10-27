@@ -24,7 +24,6 @@ export default function HistoryView({ playlistId, version }: { playlistId: numbe
     return (
       <div className="empty-state">
         <h2>No rotations yet</h2>
-        <p>Every rotation, scheduled or manual, will be listed here with the songs it put in the playlist.</p>
       </div>
     );
   }

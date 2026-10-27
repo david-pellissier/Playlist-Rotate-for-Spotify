@@ -21,7 +21,6 @@ export default function PlaylistsPage() {
       <div className="page-header">
         <div className="page-title">
           <h1>Playlists</h1>
-          <p className="muted">Each playlist rotates songs from its artists on its own schedule.</p>
         </div>
         <div className="actions">
           <ImportPlaylist onImported={(playlist) => navigate(`/playlists/${playlist.id}`)} />
@@ -35,7 +34,6 @@ export default function PlaylistsPage() {
       {playlists?.length === 0 && (
         <div className="empty-state">
           <h2>No playlists yet</h2>
-          <p>Create one from scratch or import an exported configuration.</p>
           <Link className="button primary" to="/playlists/new">New playlist</Link>
         </div>
       )}

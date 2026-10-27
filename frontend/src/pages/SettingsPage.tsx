@@ -33,7 +33,6 @@ export default function SettingsPage() {
       <div className="page-header">
         <div className="page-title">
           <h1>Settings</h1>
-          <p className="muted">Spotify connection, defaults and rules shared by all playlists.</p>
         </div>
       </div>
 
@@ -41,7 +40,6 @@ export default function SettingsPage() {
         {auth.configured ? (
           <div className="row">
             <span className="badge success dot">Connected</span>
-            <span className="muted">Credentials are set in the environment.</span>
           </div>
         ) : auth.authorize_url ? (
           <div className="banner">
@@ -57,11 +55,18 @@ export default function SettingsPage() {
       </Panel>
 
       <form onSubmit={submit}>
-        <Panel title="Defaults" description="Duration, featuring and duplicate settings are copied into new playlists.">
+        <Panel title="Defaults" info="Durations, featuring and duplicate settings are copied into new playlists.">
           <div className="field-grid">
-            <NumberField label="Minimum cooldown (rotations)" min={0} value={form.min_cooldown} onChange={(v) => set("min_cooldown", v as number)} />
+            <NumberField
+              label="Minimum cooldown (rotations)"
+              info="A picked song sits out at least this many rotations."
+              min={0}
+              value={form.min_cooldown}
+              onChange={(v) => set("min_cooldown", v as number)}
+            />
             <NumberField
               label="Catalog refresh lookback (days)"
+              info="How far back each catalog refresh looks for new releases."
               min={0}
               value={form.refresh_lookback_days}
               onChange={(v) => set("refresh_lookback_days", v as number)}
@@ -86,7 +91,7 @@ export default function SettingsPage() {
         </Panel>
       </form>
 
-      <Panel title="Global rules" description="Matched against song and album titles in every playlist, unless a playlist turns them off.">
+      <Panel title="Global rules" info="Matched against album and song titles. Playlists can turn them off individually.">
         <RuleList
           rules={rules}
           onCreate={async (kind, pattern) => {

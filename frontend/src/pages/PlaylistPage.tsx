@@ -93,7 +93,7 @@ export default function PlaylistPage() {
 
       {!playlist.enabled && (
         <div className="notice banner">
-          <span><strong>Paused.</strong> This playlist only rotates when you click "Rotate now".</span>
+          <span><strong>Paused.</strong> Manual rotations only.</span>
           <button className="small" disabled={working} onClick={resumeSchedule}>Resume schedule</button>
         </div>
       )}
@@ -114,7 +114,6 @@ export default function PlaylistPage() {
         : (
           <div className="empty-state">
             <h2>No preview yet</h2>
-            <p>A dry run shows which songs the next rotation would pick, without changing anything.</p>
             <button disabled={working} onClick={() => rotate(true)}>Run a dry run</button>
           </div>
         ))}

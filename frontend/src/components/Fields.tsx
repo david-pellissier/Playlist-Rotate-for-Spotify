@@ -1,5 +1,8 @@
+import InfoTip from "./InfoTip";
+
 export function NumberField(props: {
   label: string;
+  info?: string;
   value: number | null;
   min: number;
   optional?: boolean;
@@ -8,7 +11,7 @@ export function NumberField(props: {
 }) {
   return (
     <label>
-      {props.label}
+      <span>{props.label}{props.info && <InfoTip text={props.info} />}</span>
       <input
         type="number"
         min={props.min}

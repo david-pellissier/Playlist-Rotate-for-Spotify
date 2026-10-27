@@ -56,10 +56,10 @@ export default function ImportPlaylist({ onImported }: { onImported: (playlist: 
         <div className="modal-backdrop">
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="import-conflict-title">
             <h2 id="import-conflict-title">Playlist already exists</h2>
-            <p>{conflict.message}. What do you want to do?</p>
+            <p>{conflict.message}.</p>
             <ul className="plain">
-              <li><strong>Erase:</strong> replace its configuration with the imported one. Its song history is kept.</li>
-              <li><strong>Make a copy:</strong> import it under a new name, paused so it doesn't rotate the same Spotify playlist.</li>
+              <li><strong>Erase:</strong> replace its configuration, keep its song history.</li>
+              <li><strong>Make a copy:</strong> import under a new name, paused.</li>
             </ul>
             <div className="actions">
               <button onClick={() => setConflict(undefined)}>Cancel</button>

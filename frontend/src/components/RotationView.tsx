@@ -12,12 +12,12 @@ export default function RotationView({ rotation }: { rotation: Rotation }) {
     <div className="stack">
       <p className={rotation.dry_run ? "notice" : "success"}>
         {rotation.dry_run
-          ? <><strong>Dry run:</strong> nothing was changed. The next rotation would pick these {rotation.order.length} songs.</>
-          : <><strong>Playlist updated</strong> with {rotation.order.length} songs.</>}
+          ? <><strong>Dry run</strong> · {rotation.order.length} songs, nothing changed</>
+          : <><strong>Playlist updated</strong> · {rotation.order.length} songs</>}
       </p>
       {rotation.skipped_artists.length > 0 && (
         <p className="muted">
-          <strong>Sitting out this rotation:</strong> {rotation.skipped_artists.join(", ")}
+          <strong>Sitting out:</strong> {rotation.skipped_artists.join(", ")}
         </p>
       )}
       {rotation.missing_artists.length > 0 && (
@@ -28,7 +28,7 @@ export default function RotationView({ rotation }: { rotation: Rotation }) {
           <article key={selection.artist_name} className="card">
             <div>
               <h3>{selection.artist_name}</h3>
-              <small>{selection.eligible} eligible songs · picked songs sit out {selection.cooldown} rotations</small>
+              <small>{selection.eligible} eligible · cooldown {selection.cooldown}</small>
             </div>
             <ul className="plain">
               {selection.picks.map((pick) => (

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
 import { Checkbox, NumberField } from "../components/Fields";
+import InfoTip from "../components/InfoTip";
 import Panel from "../components/Panel";
 import RuleList from "../components/RuleList";
 import ScheduleFields from "../components/ScheduleFields";
@@ -81,30 +82,35 @@ export default function PlaylistFormPage() {
         </div>
       </div>
 
-      <Panel title="General" description="Which Spotify playlist to fill, and with which artists.">
+      <Panel title="General">
         <div className="field-grid">
           <label>
             Name
             <input required value={form.name} onChange={(e) => set("name", e.target.value)} />
           </label>
           <label>
-            Spotify playlist
+            <span>
+              Spotify playlist
+              <InfoTip text="Name, ID or URL. A playlist with this name is created if you don't own one." />
+            </span>
             <input required value={form.spotify_target} onChange={(e) => set("spotify_target", e.target.value)} />
-            <small>Name, ID or URL. A playlist with this name is created if you don't own one yet.</small>
           </label>
         </div>
         <label>
-          Artists
+          <span>
+            Artists
+            <InfoTip text="One per line, with the exact Spotify name. Lines starting with # are ignored." />
+          </span>
           <textarea rows={12} value={form.artists} onChange={(e) => set("artists", e.target.value)} />
-          <small>One per line, with the exact Spotify name. Empty lines and lines starting with # are ignored.</small>
         </label>
       </Panel>
 
       <ScheduleFields form={form} isNew={!id} onChange={set} />
 
-      <Panel title="Rotation" description="Which artists and how many of their songs go into every rotation." grid>
+      <Panel title="Rotation" grid>
         <NumberField
           label="Artists per rotation"
+          info="Leave empty to include every artist."
           min={1}
           value={form.max_artists}
           onChange={(v) => set("max_artists", v)}
@@ -112,20 +118,23 @@ export default function PlaylistFormPage() {
           placeholder="All artists"
         />
         <label>
-          Artist choice
+          <span>
+            Artist choice
+            <InfoTip text="Used when artists per rotation is limited. Fair picks the artists left out the longest first." />
+          </span>
           <select
             value={form.artist_selection}
             disabled={form.max_artists === null}
             onChange={(e) => set("artist_selection", e.target.value as ArtistSelection)}
           >
-            <option value="fair">Fair: artists left out longest first</option>
+            <option value="fair">Fair</option>
             <option value="random">Random</option>
           </select>
-          <small>{form.max_artists === null ? "Used when artists per rotation is limited." : "Ties are broken at random."}</small>
         </label>
         <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
         <NumberField
           label="Max new releases per artist"
+          info="Songs released since the last rotation are picked first, up to this number."
           min={0}
           value={form.max_new_releases}
           onChange={(v) => set("max_new_releases", v as number)}
@@ -133,7 +142,7 @@ export default function PlaylistFormPage() {
         <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
       </Panel>
 
-      <Panel title="Filters" description="Songs that don't pass these filters are never picked." grid>
+      <Panel title="Filters" grid>
         <NumberField label="Min duration (seconds)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
         <NumberField
           label="Max duration (seconds)"
@@ -147,7 +156,7 @@ export default function PlaylistFormPage() {
         <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
       </Panel>
 
-      <Panel title="Global rules" description="Click a rule to turn it off for this playlist. Manage the list in Settings.">
+      <Panel title="Global rules" info="Click a rule to turn it off for this playlist. The list itself is managed in Settings.">
         <div className="chips">
           {globalRules.map((rule) => {
             const enabled = !form.disabled_rule_ids.includes(rule.id);
@@ -163,7 +172,7 @@ export default function PlaylistFormPage() {
         </div>
       </Panel>
 
-      <Panel title="Playlist rules" description="Extra keywords or regexes that only apply to this playlist. Saved immediately.">
+      <Panel title="Playlist rules" info="Only apply to this playlist. Changes are saved immediately.">
         {id ? (
           <RuleList
             rules={playlistRules}
