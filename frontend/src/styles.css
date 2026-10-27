@@ -1236,14 +1236,90 @@ tbody tr.history-detail:hover td {
   text-transform: none;
   letter-spacing: normal;
   white-space: normal;
-  opacity: 0;
-  visibility: hidden;
+  display: none;
   pointer-events: none;
-  transition: opacity 0.12s;
 }
 
 .info-tip:hover .info-tip-text,
 .info-tip:focus .info-tip-text {
-  opacity: 1;
-  visibility: visible;
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .menu-list {
+    left: 0;
+    right: auto;
+  }
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  :root {
+    --control-height: 42px;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  button.small,
+  .button.small {
+    height: 38px;
+    padding: 0 12px;
+  }
+
+  .nav a {
+    padding: 10px 12px;
+  }
+
+  .brand-mark {
+    width: 36px;
+    height: 36px;
+  }
+
+  .back-link {
+    display: inline-block;
+    padding: 10px 0;
+  }
+
+  .tabs button {
+    height: 38px;
+  }
+
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 20px;
+    height: 20px;
+  }
+
+  label.checkbox {
+    min-height: 44px;
+  }
+
+  .chip {
+    min-height: 38px;
+  }
+
+  .chip button {
+    width: 34px;
+    height: 34px;
+  }
+
+  .menu-list button,
+  .menu-list .button {
+    height: 44px;
+  }
+
+  .info-tip {
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+  }
+
+  .info-tip::before {
+    content: "";
+    position: absolute;
+    inset: -12px;
+  }
 }

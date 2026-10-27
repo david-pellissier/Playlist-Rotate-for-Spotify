@@ -49,19 +49,22 @@ export default function RotationView({ rotation }: { rotation: Rotation }) {
             <tr>
               <th className="numeric">#</th>
               <th>Song</th>
-              <th>Artist</th>
-              <th>Album</th>
-              <th className="numeric">Length</th>
+              <th className="hide-sm">Artist</th>
+              <th className="hide-sm">Album</th>
+              <th className="numeric hide-sm">Length</th>
             </tr>
           </thead>
           <tbody>
             {rotation.order.map((pick, index) => (
               <tr key={pick.track_id}>
                 <td className="numeric muted">{index + 1}</td>
-                <td>{pick.name}</td>
-                <td>{pick.artist_name}</td>
-                <td className="muted">{pick.album_name}</td>
-                <td className="numeric muted">{formatDuration(pick.duration)}</td>
+                <td>
+                  {pick.name}
+                  <small className="show-sm">{pick.artist_name} · {pick.album_name}</small>
+                </td>
+                <td className="hide-sm">{pick.artist_name}</td>
+                <td className="muted hide-sm">{pick.album_name}</td>
+                <td className="numeric muted hide-sm">{formatDuration(pick.duration)}</td>
               </tr>
             ))}
           </tbody>
