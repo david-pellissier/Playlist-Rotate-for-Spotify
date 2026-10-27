@@ -1,11 +1,11 @@
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from itertools import batched
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Album, Artist, Settings, Track, utcnow
+from .models import Album, Artist, Playlist, Settings, Track, utcnow
 from .progress import Progress
 from .spotify import gather_all, parse_release_date, spotify
 
@@ -38,9 +38,16 @@ async def resolve_artists(session: Session, names: list[str], progress: Progress
     return known_artists(session, names)
 
 
+def artists_needing_singles(session: Session) -> set[str]:
+    playlists = session.scalars(select(Playlist).where(Playlist.albums_only.is_(False)))
+    return {name.casefold() for playlist in playlists for name in playlist.artist_names}
+
+
 async def sync_artists(session: Session, artists: list[Artist], progress: Progress) -> None:
     now = utcnow()
-    stale = [artist for artist in artists if not artist.synced_at or now - artist.synced_at > RESYNC_AFTER]
+    wanted = artists_needing_singles(session)
+    singles = {artist.id: artist.name.casefold() in wanted for artist in artists}
+    stale = [artist for artist in artists if _needs_sync(artist, now, singles[artist.id])]
     if not stale:
         return
 
@@ -48,17 +55,27 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
     progress.start("Updating catalog", len(stale))
     for artist in stale:
         progress.step = f"Updating catalog: {artist.name}"
-        new_albums = await _sync_artist(session, artist, lookback)
+        new_albums = await _sync_artist(session, artist, lookback, singles[artist.id])
         artist.synced_at = utcnow()
+        artist.singles_synced = singles[artist.id]
         session.commit()
         progress.done += 1
         if new_albums:
             log.info("Synced %s: %d new albums", artist.name, new_albums)
 
 
-async def _sync_artist(session: Session, artist: Artist, lookback: timedelta) -> int:
+def _needs_sync(artist: Artist, now: datetime, with_singles: bool) -> bool:
+    if not artist.synced_at or now - artist.synced_at > RESYNC_AFTER:
+        return True
+    return with_singles and not artist.singles_synced
+
+
+async def _sync_artist(session: Session, artist: Artist, lookback: timedelta, with_singles: bool) -> int:
     released_after = (artist.synced_at - lookback).date() if artist.synced_at else None
-    listed = await spotify.artist_albums(artist.id, released_after)
+    groups = {"album": released_after}
+    if with_singles:
+        groups["single"] = released_after if artist.singles_synced else None
+    listed = await spotify.artist_albums(artist.id, groups)
     known = set(session.scalars(select(Album.id).where(Album.id.in_([album["id"] for album in listed]))))
     new_albums = list({album["id"]: album for album in listed if album["id"] not in known}.values())
 

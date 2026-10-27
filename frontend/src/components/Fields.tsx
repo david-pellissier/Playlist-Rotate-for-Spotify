@@ -24,11 +24,16 @@ export function NumberField(props: {
   );
 }
 
-export function Checkbox(props: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+export function Checkbox(props: {
+  label: string;
+  info?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
   return (
     <label className="checkbox">
       <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
-      {props.label}
+      <span>{props.label}{props.info && <InfoTip text={props.info} />}</span>
     </label>
   );
 }

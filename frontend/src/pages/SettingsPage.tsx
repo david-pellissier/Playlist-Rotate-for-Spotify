@@ -55,7 +55,7 @@ export default function SettingsPage() {
       </Panel>
 
       <form onSubmit={submit}>
-        <Panel title="Defaults" info="Durations, featuring and duplicate settings are copied into new playlists.">
+        <Panel title="Defaults" info="Durations, featuring, duplicate and albums-only settings are copied into new playlists.">
           <div className="field-grid">
             <NumberField
               label="Minimum cooldown (rotations)"
@@ -82,6 +82,12 @@ export default function SettingsPage() {
             />
             <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
             <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
+            <Checkbox
+              label="Albums only"
+              info="Singles and EPs are excluded. They are only downloaded if another playlist with the same artist uses them."
+              checked={form.albums_only}
+              onChange={(v) => set("albums_only", v)}
+            />
           </div>
           <div className="actions">
             {save.error && <span className="error">{save.error}</span>}

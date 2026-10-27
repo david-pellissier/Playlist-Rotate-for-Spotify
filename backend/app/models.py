@@ -27,6 +27,7 @@ class Artist(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     name: Mapped[str]
     synced_at: Mapped[datetime | None]
+    singles_synced: Mapped[bool] = mapped_column(default=True)
 
     albums: Mapped[list["Album"]] = relationship(back_populates="artist", cascade="all, delete-orphan")
 
@@ -72,6 +73,7 @@ class Settings(Base):
     max_duration: Mapped[int | None]
     solo_only: Mapped[bool] = mapped_column(default=False)
     exclude_duplicates: Mapped[bool] = mapped_column(default=True)
+    albums_only: Mapped[bool] = mapped_column(default=False)
     refresh_lookback_days: Mapped[int] = mapped_column(default=30)
 
 
@@ -96,6 +98,7 @@ class Playlist(Base):
     max_duration: Mapped[int | None]
     solo_only: Mapped[bool] = mapped_column(default=False)
     exclude_duplicates: Mapped[bool] = mapped_column(default=True)
+    albums_only: Mapped[bool] = mapped_column(default=False)
     disabled_rule_ids: Mapped[list[int]] = mapped_column(JSON, default=list)
     last_rotated_at: Mapped[datetime | None]
     last_error: Mapped[str | None]

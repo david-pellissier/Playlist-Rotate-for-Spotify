@@ -16,7 +16,6 @@ AUTHORIZE_URL = "https://accounts.spotify.com/authorize"
 TOKEN_URL = "https://accounts.spotify.com/api/token"
 TOKEN_FILE = env.database_path.parent / "spotify_token.json"
 SCOPES = "playlist-read-private playlist-modify-public playlist-modify-private"
-ALBUM_GROUPS = ("album", "single")
 PLAYLIST_ID = re.compile(r"(?:playlist[/:])([A-Za-z0-9]{22})|^([A-Za-z0-9]{22})$")
 IDEMPOTENT_METHODS = {"GET", "PUT", "DELETE"}
 MAX_ATTEMPTS = 5
@@ -185,8 +184,8 @@ class Spotify:
             (artist for artist in result["artists"]["items"] if artist and artist["name"].casefold() == wanted), None
         )
 
-    async def artist_albums(self, artist_id: str, released_after: date | None) -> list[dict]:
-        async def fetch_group(group: str) -> list[dict]:
+    async def artist_albums(self, artist_id: str, groups: dict[str, date | None]) -> list[dict]:
+        async def fetch_group(group: str, released_after: date | None) -> list[dict]:
             albums = []
             async for page in self.paginate(f"/artists/{artist_id}/albums", {"include_groups": group, "limit": 10}):
                 albums.extend(page)
@@ -194,8 +193,8 @@ class Spotify:
                     break
             return albums
 
-        groups = await gather_all(fetch_group(group) for group in ALBUM_GROUPS)
-        return [album for group in groups for album in group]
+        listed = await gather_all(fetch_group(group, released_after) for group, released_after in groups.items())
+        return [album for group in listed for album in group]
 
     async def album_tracks(self, album_id: str) -> list[dict]:
         tracks = []

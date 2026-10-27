@@ -12,6 +12,7 @@ export interface Settings {
   max_duration: number | null;
   solo_only: boolean;
   exclude_duplicates: boolean;
+  albums_only: boolean;
   refresh_lookback_days: number;
 }
 
@@ -34,6 +35,7 @@ export interface PlaylistInput {
   max_duration: number | null;
   solo_only: boolean;
   exclude_duplicates: boolean;
+  albums_only: boolean;
   disabled_rule_ids: number[];
 }
 

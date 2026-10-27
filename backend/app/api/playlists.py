@@ -7,7 +7,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..catalog import Entry, album_rule_match, load_catalog
+from ..catalog import Entry, album_automatic_exclusion, load_catalog
 from ..db import get_session
 from ..models import Album, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track, utcnow
 from ..progress import running_jobs
@@ -172,7 +172,7 @@ def set_album_enabled(
     key = (playlist.id, album_id)
     delete_if_present(session, DisabledAlbum, key)
     delete_if_present(session, EnabledAlbum, key)
-    excluded_by_rule = album_rule_match(session, playlist, album) is not None
+    excluded_by_rule = album_automatic_exclusion(session, playlist, album) is not None
     if data.enabled and excluded_by_rule:
         session.add(EnabledAlbum(playlist_id=playlist.id, album_id=album_id))
     elif not data.enabled and not excluded_by_rule:

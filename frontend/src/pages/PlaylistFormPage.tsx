@@ -28,6 +28,7 @@ function defaults(settings: Settings): PlaylistInput {
     max_duration: settings.max_duration,
     solo_only: settings.solo_only,
     exclude_duplicates: settings.exclude_duplicates,
+    albums_only: settings.albums_only,
     disabled_rule_ids: [],
   };
 }
@@ -154,6 +155,12 @@ export default function PlaylistFormPage() {
         />
         <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
         <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
+        <Checkbox
+          label="Albums only"
+          info="Singles and EPs are excluded. They are only downloaded if another playlist with the same artist uses them."
+          checked={form.albums_only}
+          onChange={(v) => set("albums_only", v)}
+        />
       </Panel>
 
       <Panel title="Global rules" info="Click a rule to turn it off for this playlist. The list itself is managed in Settings.">

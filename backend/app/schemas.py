@@ -18,6 +18,7 @@ class SettingsData(Schema):
     max_duration: int | None = Field(default=None, ge=1)
     solo_only: bool
     exclude_duplicates: bool
+    albums_only: bool = False
     refresh_lookback_days: int = Field(ge=0)
 
 
@@ -57,6 +58,7 @@ class PlaylistSettings(Schema):
     max_duration: int | None = Field(default=None, ge=1)
     solo_only: bool
     exclude_duplicates: bool
+    albums_only: bool = False
 
 
 class PlaylistIn(PlaylistSettings):

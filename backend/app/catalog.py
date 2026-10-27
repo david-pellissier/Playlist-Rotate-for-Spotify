@@ -95,8 +95,14 @@ def active_rules(session: Session, playlist: Playlist) -> list[Rule]:
     return [*global_rules, *playlist.rules]
 
 
-def album_rule_match(session: Session, playlist: Playlist, album: Album) -> str | None:
-    return RuleMatcher(active_rules(session, playlist)).match(album.name)
+def album_automatic_exclusion(session: Session, playlist: Playlist, album: Album) -> str | None:
+    return _album_exclusion(playlist, RuleMatcher(active_rules(session, playlist)), album)
+
+
+def _album_exclusion(playlist: Playlist, matcher: RuleMatcher, album: Album) -> str | None:
+    if playlist.albums_only and album.album_type != "album":
+        return "single/EP"
+    return matcher.match(album.name)
 
 
 def load_catalog(session: Session, playlist: Playlist, artist_ids: list[str]) -> dict[str, list[Entry]]:
@@ -119,7 +125,7 @@ def load_catalog(session: Session, playlist: Playlist, artist_ids: list[str]) ->
     album_statuses: dict[str, Status] = {}
     for track, album in rows:
         if album.id not in album_statuses:
-            album_statuses[album.id] = _album_status(matcher, album, disabled_albums, enabled_albums)
+            album_statuses[album.id] = _album_status(playlist, matcher, album, disabled_albums, enabled_albums)
         album_status = album_statuses[album.id]
         state = states.get(track.id)
         status = _track_status(playlist, matcher, track, album, state, album_status, track.id in enabled_tracks)
@@ -135,8 +141,10 @@ def _playlist_ids(session: Session, column: InstrumentedAttribute[str], playlist
     return set(session.scalars(select(column).where(column.class_.playlist_id == playlist_id)))
 
 
-def _album_status(matcher: RuleMatcher, album: Album, disabled: set[str], enabled: set[str]) -> Status:
-    status = Status(automatic=matcher.match(album.name))
+def _album_status(
+    playlist: Playlist, matcher: RuleMatcher, album: Album, disabled: set[str], enabled: set[str]
+) -> Status:
+    status = Status(automatic=_album_exclusion(playlist, matcher, album))
     if album.id in disabled:
         status.exclude("album disabled", USER)
     status.apply_automatic(forced=album.id in enabled)
