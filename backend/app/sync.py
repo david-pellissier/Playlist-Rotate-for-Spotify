@@ -1,17 +1,18 @@
-import asyncio
 import logging
 from datetime import timedelta
+from itertools import batched
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Album, Artist, Settings, Track, utcnow
 from .progress import Progress
-from .spotify import parse_release_date, spotify
+from .spotify import gather_all, parse_release_date, spotify
 
 log = logging.getLogger(__name__)
 
 RESYNC_AFTER = timedelta(hours=1)
+ALBUM_BATCH = 20
 
 
 def known_artists(session: Session, names: list[str]) -> tuple[list[Artist], list[str]]:
@@ -24,7 +25,7 @@ def known_artists(session: Session, names: list[str]) -> tuple[list[Artist], lis
 async def resolve_artists(session: Session, names: list[str], progress: Progress) -> tuple[list[Artist], list[str]]:
     _, unknown = known_artists(session, names)
     progress.start("Finding artists", len(unknown))
-    found = await asyncio.gather(*(progress.count(spotify.find_artist(name)) for name in unknown))
+    found = await gather_all(progress.count(spotify.find_artist(name)) for name in unknown)
 
     for name, data in zip(unknown, found):
         if data is None:
@@ -44,36 +45,44 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
         return
 
     lookback = timedelta(days=session.get(Settings, 1).refresh_lookback_days)
-    progress.start("Listing albums", len(stale))
-    album_lists = await asyncio.gather(*(
-        progress.count(spotify.artist_albums(artist.id, (artist.synced_at - lookback).date() if artist.synced_at else None))
-        for artist in stale
-    ))
+    progress.start("Updating catalog", len(stale))
+    for artist in stale:
+        progress.step = f"Updating catalog: {artist.name}"
+        new_albums = await _sync_artist(session, artist, lookback)
+        artist.synced_at = utcnow()
+        session.commit()
+        progress.done += 1
+        if new_albums:
+            log.info("Synced %s: %d new albums", artist.name, new_albums)
 
-    fetched_ids = [data["id"] for albums in album_lists for data in albums]
-    known_albums = set(session.scalars(select(Album.id).where(Album.id.in_(fetched_ids))))
-    new_albums = {}
-    for artist, albums in zip(stale, album_lists):
-        for data in albums:
-            if data["id"] not in known_albums and data["id"] not in new_albums:
-                new_albums[data["id"]] = (artist, data)
 
-    progress.start("Downloading tracks", len(new_albums))
-    track_lists = await asyncio.gather(*(progress.count(spotify.album_tracks(album_id)) for album_id in new_albums))
+async def _sync_artist(session: Session, artist: Artist, lookback: timedelta) -> int:
+    released_after = (artist.synced_at - lookback).date() if artist.synced_at else None
+    listed = await spotify.artist_albums(artist.id, released_after)
+    known = set(session.scalars(select(Album.id).where(Album.id.in_([album["id"] for album in listed]))))
+    new_albums = list({album["id"]: album for album in listed if album["id"] not in known}.values())
 
-    seen_tracks = set()
-    for (artist, data), tracks in zip(new_albums.values(), track_lists):
-        tracks = [t for t in tracks if t.get("id") and t["id"] not in seen_tracks]
-        seen_tracks.update(t["id"] for t in tracks)
-        album = Album(
-            id=data["id"],
-            artist_id=artist.id,
-            name=data["name"],
-            album_type=data["album_type"],
-            release_date=parse_release_date(data["release_date"]),
-            image_url=data["images"][-1]["url"] if data.get("images") else None,
-        )
-        album.tracks = [
+    for batch in batched(new_albums, ALBUM_BATCH):
+        track_lists = await gather_all(spotify.album_tracks(album["id"]) for album in batch)
+        track_ids = [track["id"] for tracks in track_lists for track in tracks if track.get("id")]
+        seen = set(session.scalars(select(Track.id).where(Track.id.in_(track_ids))))
+        for data, tracks in zip(batch, track_lists):
+            tracks = [track for track in tracks if track.get("id") and track["id"] not in seen]
+            seen.update(track["id"] for track in tracks)
+            session.add(_album(artist, data, tracks))
+        session.commit()
+    return len(new_albums)
+
+
+def _album(artist: Artist, data: dict, tracks: list[dict]) -> Album:
+    return Album(
+        id=data["id"],
+        artist_id=artist.id,
+        name=data["name"],
+        album_type=data["album_type"],
+        release_date=parse_release_date(data["release_date"]),
+        image_url=data["images"][-1]["url"] if data.get("images") else None,
+        tracks=[
             Track(
                 id=track["id"],
                 name=track["name"],
@@ -83,10 +92,5 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
                 artist_ids=[a["id"] for a in track["artists"]],
             )
             for track in tracks
-        ]
-        session.add(album)
-
-    for artist in stale:
-        artist.synced_at = now
-    session.commit()
-    log.info("Synced %d artists, %d new albums", len(stale), len(new_albums))
+        ],
+    )

@@ -3,8 +3,8 @@ import json
 import logging
 import re
 import time
-from collections.abc import AsyncIterator
-from datetime import date
+from collections.abc import AsyncIterator, Awaitable, Iterable
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlencode
 
 import httpx
@@ -20,7 +20,9 @@ ALBUM_GROUPS = ("album", "single")
 PLAYLIST_ID = re.compile(r"(?:playlist[/:])([A-Za-z0-9]{22})|^([A-Za-z0-9]{22})$")
 IDEMPOTENT_METHODS = {"GET", "PUT", "DELETE"}
 MAX_ATTEMPTS = 5
-MAX_CONCURRENCY = 8
+MAX_CONCURRENCY = 4
+REQUEST_INTERVAL = 0.2
+MAX_RATE_LIMIT_WAIT = 60
 PLAYLIST_CHUNK = 100
 
 log = logging.getLogger(__name__)
@@ -28,6 +30,23 @@ log = logging.getLogger(__name__)
 
 class SpotifyError(Exception):
     pass
+
+
+class RateLimitError(SpotifyError):
+    def __init__(self, retry_at: datetime) -> None:
+        self.retry_at = retry_at
+        local_time = retry_at.replace(tzinfo=UTC).astimezone(env.timezone)
+        super().__init__(f"Spotify rate limit reached, retry after {local_time:%Y-%m-%d %H:%M}")
+
+
+async def gather_all[T](awaitables: Iterable[Awaitable[T]]) -> list[T]:
+    tasks = [asyncio.ensure_future(awaitable) for awaitable in awaitables]
+    try:
+        return await asyncio.gather(*tasks)
+    except BaseException:
+        for task in tasks:
+            task.cancel()
+        raise
 
 
 def parse_release_date(value: str) -> date:
@@ -55,6 +74,9 @@ class Spotify:
         self._token_expires_at = 0.0
         self._token_lock = asyncio.Lock()
         self._slots = asyncio.Semaphore(MAX_CONCURRENCY)
+        self._pace_lock = asyncio.Lock()
+        self._next_request_at = 0.0
+        self._blocked_until: datetime | None = None
 
     async def close(self) -> None:
         await self._http.aclose()
@@ -99,12 +121,30 @@ class Spotify:
             self._token_expires_at = time.monotonic() + payload["expires_in"] - 60
             return self._token
 
+    async def _wait_for_turn(self) -> None:
+        if self._blocked_until and datetime.now(UTC).replace(tzinfo=None) < self._blocked_until:
+            raise RateLimitError(self._blocked_until)
+        async with self._pace_lock:
+            delay = self._next_request_at - time.monotonic()
+            if delay > 0:
+                await asyncio.sleep(delay)
+            self._next_request_at = time.monotonic() + REQUEST_INTERVAL
+
+    def _rate_limited(self, method: str, url: str, response: httpx.Response) -> float:
+        wait = float(response.headers.get("Retry-After", "1"))
+        log.warning("Spotify rate limit on %s %s, Retry-After %ds", method, url, wait)
+        if wait > MAX_RATE_LIMIT_WAIT:
+            self._blocked_until = datetime.now(UTC).replace(tzinfo=None) + timedelta(seconds=wait)
+            raise RateLimitError(self._blocked_until)
+        return wait + 1
+
     async def request(self, method: str, url: str, **kwargs) -> dict | None:
         retryable = method in IDEMPOTENT_METHODS
         problem = ""
         async with self._slots:
             for attempt in range(MAX_ATTEMPTS):
                 headers = {"Authorization": f"Bearer {await self._access_token()}"}
+                await self._wait_for_turn()
                 try:
                     response = await self._http.request(method, url, headers=headers, **kwargs)
                 except httpx.TransportError as error:
@@ -115,7 +155,7 @@ class Spotify:
                     continue
                 if response.status_code == 429:
                     problem = "rate limited"
-                    await asyncio.sleep(int(response.headers.get("Retry-After", "1")) + 1)
+                    await asyncio.sleep(self._rate_limited(method, url, response))
                     continue
                 if response.status_code == 401:
                     problem = "unauthorized"
@@ -154,7 +194,7 @@ class Spotify:
                     break
             return albums
 
-        groups = await asyncio.gather(*(fetch_group(group) for group in ALBUM_GROUPS))
+        groups = await gather_all(fetch_group(group) for group in ALBUM_GROUPS)
         return [album for group in groups for album in group]
 
     async def album_tracks(self, album_id: str) -> list[dict]:
