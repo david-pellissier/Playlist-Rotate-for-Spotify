@@ -1487,3 +1487,130 @@ tbody tr.history-detail:hover td {
     --artist-glow: 0.42;
   }
 }
+
+.playlist-cover {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.06), 0 4px 12px rgb(0 0 0 / 0.18);
+}
+
+.playlist-cover.placeholder {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, hsl(var(--cover-hue) 55% 46%), hsl(calc(var(--cover-hue) + 50) 60% 30%));
+  color: rgb(255 255 255 / 0.85);
+}
+
+.playlist-cover.placeholder svg {
+  width: 45%;
+  height: 45%;
+}
+
+.playlist-cover.large {
+  width: 136px;
+  height: 136px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.06), 0 18px 40px rgb(0 0 0 / 0.3);
+}
+
+.cell-playlist {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.playlist-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  contain: paint;
+  clip-path: inset(0 round 18px);
+  align-items: flex-end;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.playlist-hero::before {
+  content: "";
+  position: absolute;
+  inset: -60px;
+  z-index: -1;
+  background: var(--hero-image, none) center / cover;
+  filter: blur(40px) saturate(1.8) brightness(1.15);
+  opacity: var(--hero-glow, 0.3);
+}
+
+.playlist-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--surface) var(--glow-veil, 45%), transparent) 0%,
+    color-mix(in srgb, var(--surface) 75%, transparent) 55%,
+    var(--surface) 100%
+  );
+}
+
+.hero-main {
+  display: flex;
+  align-items: flex-end;
+  gap: 20px;
+  min-width: 0;
+}
+
+.hero-eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.playlist-hero h1 {
+  font-size: 28px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .playlist-hero {
+    --hero-glow: 0.55;
+    --glow-veil: 10%;
+  }
+}
+
+@media (max-width: 720px) {
+  .playlist-cover {
+    width: 40px;
+    height: 40px;
+  }
+
+  .playlist-cover.large {
+    width: 96px;
+    height: 96px;
+    border-radius: 12px;
+  }
+
+  .playlist-hero {
+    padding: 16px;
+  }
+
+  .hero-main {
+    align-items: center;
+    gap: 14px;
+  }
+
+  .cell-playlist .show-sm {
+    margin-top: 4px;
+  }
+
+  .playlist-hero h1 {
+    font-size: 22px;
+  }
+}

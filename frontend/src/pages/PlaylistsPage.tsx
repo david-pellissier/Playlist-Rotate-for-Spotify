@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
 import ImportPlaylist from "../components/ImportPlaylist";
+import PlaylistCover from "../components/PlaylistCover";
 import PlaylistStatus from "../components/PlaylistStatus";
 import { formatDate, formatSchedule } from "../format";
 import { useAction, useLoader } from "../hooks";
@@ -44,7 +45,7 @@ export default function PlaylistsPage() {
             <thead>
               <tr>
                 <th>Playlist</th>
-                <th>Status</th>
+                <th className="hide-sm">Status</th>
                 <th className="numeric hide-sm">Artists</th>
                 <th className="hide-sm">Schedule</th>
                 <th className="hide-sm">Last rotation</th>
@@ -56,12 +57,16 @@ export default function PlaylistsPage() {
               {playlists.map((p) => (
                 <tr key={p.id}>
                   <td>
-                    <div className="cell-title">
-                      <Link to={`/playlists/${p.id}`}>{p.name}</Link>
-                      <small>{p.spotify_target}</small>
+                    <div className="cell-playlist">
+                      <PlaylistCover name={p.name} url={p.cover_url} />
+                      <div className="cell-title">
+                        <Link to={`/playlists/${p.id}`}>{p.name}</Link>
+                        <small>{p.spotify_target}</small>
+                        <span className="show-sm"><PlaylistStatus enabled={p.enabled} error={p.last_error} /></span>
+                      </div>
                     </div>
                   </td>
-                  <td><PlaylistStatus enabled={p.enabled} error={p.last_error} /></td>
+                  <td className="hide-sm"><PlaylistStatus enabled={p.enabled} error={p.last_error} /></td>
                   <td className="numeric hide-sm">{p.artist_count}</td>
                   <td className="nowrap hide-sm">{formatSchedule(p.update_interval_days, p.rotation_time)}</td>
                   <td className="nowrap hide-sm">{formatDate(p.last_rotated_at)}</td>

@@ -2,7 +2,7 @@ import math
 from datetime import date
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -60,6 +60,7 @@ def list_playlists(session: Session = Depends(get_session)):
             last_rotated_at=p.last_rotated_at,
             next_rotation_at=p.next_rotation_at,
             last_error=p.last_error,
+            cover_url=p.cover_url,
         )
         for p in session.scalars(select(Playlist).order_by(Playlist.name))
     ]
@@ -82,10 +83,22 @@ def read_playlist(playlist: Playlist = Depends(get_playlist)):
 def update_playlist(data: PlaylistIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
     if data.spotify_target != playlist.spotify_target:
         playlist.spotify_playlist_id = None
+        playlist.cover = None
     for field, value in data.model_dump().items():
         setattr(playlist, field, value)
     commit_or_conflict(session)
     return playlist
+
+
+@router.get("/{playlist_id}/cover")
+def read_cover(playlist: Playlist = Depends(get_playlist)):
+    if not playlist.cover_url:
+        raise HTTPException(404, "This playlist has no cover")
+    return Response(
+        playlist.cover.content,
+        media_type=playlist.cover.content_type,
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @router.delete("/{playlist_id}", status_code=204)

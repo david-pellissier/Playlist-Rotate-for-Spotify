@@ -1,6 +1,6 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { api } from "../api";
-import { formatDuration } from "../format";
+import { formatDuration, nameHue } from "../format";
 import InfoTip from "./InfoTip";
 import { useAction, useDebounced, useLoader } from "../hooks";
 import type { Catalog, CatalogAlbum, CatalogStatus, CatalogTrack } from "../types";
@@ -148,9 +148,8 @@ function groupByArtist(albums: CatalogAlbum[]): [string, CatalogAlbum[]][] {
 function ArtistAvatar({ name, image }: { name: string; image: string | null }) {
   if (image) return <img className="artist-avatar" src={image} alt="" loading="lazy" />;
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
-  const hue = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
   return (
-    <span className="artist-avatar initials" style={{ "--avatar-hue": hue } as CSSProperties} aria-hidden="true">
+    <span className="artist-avatar initials" style={{ "--avatar-hue": nameHue(name) } as CSSProperties} aria-hidden="true">
       {initials}
     </span>
   );

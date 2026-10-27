@@ -72,6 +72,7 @@ class PlaylistOut(PlaylistIn):
     last_rotated_at: UtcDatetime | None
     next_rotation_at: UtcDatetime
     last_error: str | None
+    cover_url: str | None
     rules: list[RuleOut]
 
 
@@ -94,6 +95,7 @@ class PlaylistSummary(Schema):
     last_rotated_at: UtcDatetime | None
     next_rotation_at: UtcDatetime
     last_error: str | None
+    cover_url: str | None
 
 
 ExcludedBy = Literal["user", "auto", "album"] | None

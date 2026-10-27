@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 
 from .config import env
+from .covers import refresh_covers
 from .db import SessionLocal
 from .models import Playlist, utcnow
 from .rotation import rotate
@@ -72,6 +73,7 @@ async def run_scheduler() -> None:
     while True:
         try:
             await rotate_due_playlists()
+            await refresh_covers()
         except Exception:
             log.exception("Scheduler run failed")
         await asyncio.sleep(env.scheduler_poll_seconds)

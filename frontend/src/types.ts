@@ -46,6 +46,7 @@ export interface Playlist extends PlaylistInput {
   last_rotated_at: string | null;
   next_rotation_at: string;
   last_error: string | null;
+  cover_url: string | null;
   rules: Rule[];
 }
 
@@ -60,6 +61,7 @@ export interface PlaylistSummary {
   last_rotated_at: string | null;
   next_rotation_at: string;
   last_error: string | null;
+  cover_url: string | null;
 }
 
 export type ExcludedBy = "user" | "auto" | "album" | null;

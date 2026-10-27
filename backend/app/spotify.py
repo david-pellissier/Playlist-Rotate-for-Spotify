@@ -55,6 +55,11 @@ def pick_image(images: list[dict] | None, min_size: int = 300) -> str:
     return min(large_enough, key=lambda image: image["width"])["url"] if large_enough else images[0]["url"]
 
 
+def parse_playlist_id(target: str) -> str | None:
+    match = PLAYLIST_ID.search(target.split("?")[0].strip())
+    return match and (match.group(1) or match.group(2))
+
+
 def parse_release_date(value: str) -> date:
     year, month, day = ([int(part) for part in value.split("-")] + [1, 1])[:3]
     return date(max(year, 1), max(month, 1), max(day, 1))
@@ -213,8 +218,8 @@ class Spotify:
         return tracks
 
     async def resolve_playlist(self, target: str) -> str:
-        if match := PLAYLIST_ID.search(target.split("?")[0].strip()):
-            return match.group(1) or match.group(2)
+        if playlist_id := parse_playlist_id(target):
+            return playlist_id
         user_id = (await self.request("GET", "/me"))["id"]
         async for page in self.paginate("/me/playlists"):
             for playlist in page:
@@ -222,6 +227,17 @@ class Spotify:
                     return playlist["id"]
         created = await self.request("POST", "/me/playlists", json={"name": target, "public": False})
         return created["id"]
+
+    async def playlist_cover(self, playlist_id: str) -> tuple[bytes, str] | None:
+        url = pick_image(await self.request("GET", f"/playlists/{playlist_id}/images"))
+        if not url:
+            return None
+        try:
+            response = await self._http.get(url)
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise SpotifyError(f"Could not download the playlist cover: {error!r}") from error
+        return response.content, response.headers.get("content-type", "image/jpeg")
 
     async def replace_playlist_items(self, playlist_id: str, uris: list[str]) -> None:
         url = f"/playlists/{playlist_id}/items"

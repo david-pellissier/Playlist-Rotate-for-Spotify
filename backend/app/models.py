@@ -1,7 +1,7 @@
 import math
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import JSON, ForeignKey, String, Text
+from sqlalchemy import JSON, ForeignKey, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .config import env
@@ -105,6 +105,15 @@ class Playlist(Base):
     last_error: Mapped[str | None]
 
     rules: Mapped[list["Rule"]] = relationship(cascade="all, delete-orphan", passive_deletes=True)
+    cover: Mapped["PlaylistCover | None"] = relationship(
+        lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+    @property
+    def cover_url(self) -> str | None:
+        if self.cover is None or not self.cover.content_type:
+            return None
+        return f"/api/playlists/{self.id}/cover?v={self.cover.updated_at:%Y%m%d%H%M%S%f}"
 
     @property
     def artist_names(self) -> list[str]:
@@ -132,6 +141,16 @@ class Playlist(Base):
     def _rotation_on(self, day: date) -> datetime:
         scheduled = datetime.combine(day, self.rotation_time, env.timezone)
         return scheduled.astimezone(UTC).replace(tzinfo=None)
+
+
+class PlaylistCover(Base):
+    __tablename__ = "playlist_covers"
+
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True)
+    content: Mapped[bytes] = mapped_column(LargeBinary, deferred=True)
+    content_type: Mapped[str]
+    updated_at: Mapped[datetime]
+    checked_at: Mapped[datetime]
 
 
 class Rule(Base):

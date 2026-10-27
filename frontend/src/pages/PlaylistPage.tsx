@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { type CSSProperties, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import CatalogView from "../components/CatalogView";
 import HistoryView from "../components/HistoryView";
 import JobProgress, { useJobProgress } from "../components/JobProgress";
 import Menu from "../components/Menu";
+import PlaylistCover from "../components/PlaylistCover";
 import PlaylistStatus from "../components/PlaylistStatus";
 import RotationView from "../components/RotationView";
 import { formatDate, formatSchedule } from "../format";
@@ -59,14 +60,21 @@ export default function PlaylistPage() {
 
   return (
     <section className="stack">
-      <div className="page-header">
-        <div className="page-title">
-          <Link to="/" className="back-link">← Playlists</Link>
-          <h1>
-            {playlist.name}
-            <PlaylistStatus enabled={playlist.enabled} error={playlist.last_error} />
-          </h1>
-          <p className="muted">{playlist.spotify_target}</p>
+      <Link to="/" className="back-link">← Playlists</Link>
+      <div
+        className="page-header playlist-hero"
+        style={playlist.cover_url ? ({ "--hero-image": `url("${playlist.cover_url}")` } as CSSProperties) : undefined}
+      >
+        <div className="hero-main">
+          <PlaylistCover name={playlist.name} url={playlist.cover_url} large />
+          <div className="page-title">
+            <span className="hero-eyebrow">Playlist</span>
+            <h1>
+              {playlist.name}
+              <PlaylistStatus enabled={playlist.enabled} error={playlist.last_error} />
+            </h1>
+            <p className="muted">{playlist.spotify_target}</p>
+          </div>
         </div>
         <div className="actions">
           <Link className="button" to={`/playlists/${id}/edit`}>Edit</Link>
