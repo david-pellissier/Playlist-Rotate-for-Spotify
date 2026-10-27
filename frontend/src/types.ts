@@ -108,11 +108,14 @@ export interface Catalog {
   albums: CatalogAlbum[];
   total_tracks: number;
   total_artists: number;
+  status_counts: Partial<Record<SongStatus, number>>;
+  type_counts: Partial<Record<ReleaseType, number>>;
   page: number;
   page_size: number;
 }
 
-export type CatalogStatus = "all" | "eligible" | "new" | "excluded" | "cooldown" | "current";
+export type SongStatus = "available" | "new" | "cooldown" | "current" | "excluded";
+export type ReleaseType = "album" | "single";
 
 export interface Pick {
   track_id: string;

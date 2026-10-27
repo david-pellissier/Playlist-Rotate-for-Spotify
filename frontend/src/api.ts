@@ -1,7 +1,13 @@
 import type {
-  AuthStatus, Catalog, CatalogStatus, History, ImportConflict, Playlist, PlaylistInput, PlaylistSummary, Progress,
+  AuthStatus, Catalog, History, ImportConflict, Playlist, PlaylistInput, PlaylistSummary, Progress,
   Rotation, RotationTrack, Rule, RuleKind, Settings,
 } from "./types";
+
+export interface CatalogFilters {
+  q: string;
+  page: number;
+  params: Record<string, string[]>;
+}
 
 type ErrorDetail = string | { loc: (string | number)[]; msg: string }[] | undefined;
 
@@ -48,9 +54,11 @@ export const api = {
   createPlaylistRule: (id: number, kind: RuleKind, pattern: string) =>
     request<Rule>(`/playlists/${id}/rules`, "POST", { kind, pattern }),
 
-  catalog: (id: number, filters: { artistId: string; q: string; status: CatalogStatus; page: number }) => {
-    const params = new URLSearchParams({ q: filters.q, status: filters.status, page: String(filters.page) });
-    if (filters.artistId) params.set("artist_id", filters.artistId);
+  catalog: (id: number, filters: CatalogFilters) => {
+    const params = new URLSearchParams({ q: filters.q, page: String(filters.page) });
+    for (const [name, values] of Object.entries(filters.params)) {
+      for (const value of values) params.append(name, value);
+    }
     return request<Catalog>(`/playlists/${id}/catalog?${params}`);
   },
   setAlbumEnabled: (id: number, albumId: string, enabled: boolean) =>

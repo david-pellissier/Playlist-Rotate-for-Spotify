@@ -2,47 +2,73 @@ import { type CSSProperties, useEffect, useState } from "react";
 import { api } from "../api";
 import { formatDuration, nameHue } from "../format";
 import InfoTip from "./InfoTip";
+import MultiSelect, { toggled } from "./MultiSelect";
 import { useAction, useDebounced, useLoader } from "../hooks";
-import type { Catalog, CatalogAlbum, CatalogStatus, CatalogTrack } from "../types";
+import type { Catalog, CatalogAlbum, CatalogTrack, ReleaseType, SongStatus } from "../types";
 
-const STATUSES: Record<CatalogStatus, string> = {
-  all: "All songs",
-  eligible: "Eligible",
-  new: "New releases",
-  excluded: "Excluded",
+const STATUSES: Record<SongStatus, string> = {
+  available: "Available",
+  new: "New release",
   cooldown: "On cooldown",
   current: "In playlist",
+  excluded: "Excluded",
 };
 
-export default function CatalogView({ playlistId, version }: { playlistId: number; version: number }) {
-  const [artistId, setArtistId] = useState("");
+const RELEASE_TYPES: Record<ReleaseType, string> = {
+  album: "Albums",
+  single: "Singles & EPs",
+};
+
+export default function CatalogView({ playlistId, albumsOnly, version }: {
+  playlistId: number;
+  albumsOnly: boolean;
+  version: number;
+}) {
+  const defaultHiddenTypes = albumsOnly ? "single" : "";
+  const [hiddenArtists, setHiddenArtists] = useState<Set<string>>(new Set());
+  const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(defaultHiddenTypes ? [defaultHiddenTypes] : []));
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState<CatalogStatus>("all");
   const [page, setPage] = useState(1);
   const q = useDebounced(search);
+  const [artistIds, setArtistIds] = useState<string[]>([]);
+  const shownArtists = artistIds.filter((id) => !hiddenArtists.has(id));
+  const artistParams: Record<string, string[]> = hiddenArtists.size <= shownArtists.length || !shownArtists.length
+    ? { hide_artist: [...hiddenArtists] }
+    : { artist: shownArtists };
   const { data: catalog, error, reload } = useLoader(
-    () => api.catalog(playlistId, { artistId, q, status, page }),
-    [playlistId, artistId, q, status, page, version],
+    () => api.catalog(playlistId, {
+      q,
+      page,
+      params: { ...artistParams, hide_status: [...hiddenStatuses], hide_type: [...hiddenTypes] },
+    }),
+    [playlistId, hiddenArtists, hiddenStatuses, hiddenTypes, q, page, version],
   );
   const action = useAction();
 
-  const filtering = artistId !== "" || q.trim() !== "" || status !== "all";
+  useEffect(() => {
+    if (catalog) setArtistIds(catalog.artists.map((artist) => artist.id));
+  }, [catalog]);
+
+  const filterKey = [...hiddenArtists, "|", ...hiddenStatuses, "|", ...hiddenTypes, "|", q.trim()].join(",");
+  const filtering = hiddenArtists.size > 0 || hiddenStatuses.size > 0 || q.trim() !== ""
+    || [...hiddenTypes].join() !== defaultHiddenTypes;
   const [allOpen, setAllOpen] = useState(false);
-  const [toggled, setToggled] = useState<Map<string, boolean>>(new Map());
-  const isOpen = (key: string) => toggled.get(key) ?? allOpen;
+  const [toggledOpen, setToggledOpen] = useState<Map<string, boolean>>(new Map());
+  const isOpen = (key: string) => toggledOpen.get(key) ?? allOpen;
 
   useEffect(() => {
     setAllOpen(filtering);
-    setToggled(new Map());
-  }, [filtering, artistId, q, status]);
+    setToggledOpen(new Map());
+  }, [filtering, filterKey]);
 
   function toggle(key: string) {
-    setToggled((current) => new Map(current).set(key, !isOpen(key)));
+    setToggledOpen((current) => new Map(current).set(key, !isOpen(key)));
   }
 
   function toggleAll() {
     setAllOpen(!allOpen);
-    setToggled(new Map());
+    setToggledOpen(new Map());
   }
 
   function filter(apply: () => void) {
@@ -68,17 +94,16 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
   return (
     <div className="stack">
       <div className="toolbar">
-        <select aria-label="Artist" value={artistId} onChange={(e) => filter(() => setArtistId(e.target.value))}>
-          <option value="">All artists</option>
-          {catalog?.artists.map((artist) => (
-            <option key={artist.id} value={artist.id}>
-              {artist.name} ({artist.eligible}/{artist.total} eligible)
-            </option>
-          ))}
-        </select>
-        <select aria-label="Status" value={status} onChange={(e) => filter(() => setStatus(e.target.value as CatalogStatus))}>
-          {Object.entries(STATUSES).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
+        <MultiSelect
+          noun="artists"
+          options={catalog?.artists.map((artist) => ({
+            value: artist.id,
+            label: artist.name,
+            hint: `${artist.eligible}/${artist.total}`,
+          })) ?? []}
+          hidden={hiddenArtists}
+          onChange={(next) => filter(() => setHiddenArtists(next))}
+        />
         <input
           type="search"
           aria-label="Search"
@@ -87,6 +112,22 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
           onChange={(e) => filter(() => setSearch(e.target.value))}
         />
         <button disabled={!catalog?.albums.length} onClick={toggleAll}>{allOpen ? "Collapse all" : "Expand all"}</button>
+      </div>
+      <div className="filter-row">
+        <ChipFilter
+          label="Status"
+          options={STATUSES}
+          counts={catalog?.status_counts ?? {}}
+          hidden={hiddenStatuses}
+          onChange={(next) => filter(() => setHiddenStatuses(next))}
+        />
+        <ChipFilter
+          label="Release"
+          options={RELEASE_TYPES}
+          counts={catalog?.type_counts ?? {}}
+          hidden={hiddenTypes}
+          onChange={(next) => filter(() => setHiddenTypes(next))}
+        />
       </div>
 
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
@@ -135,6 +176,29 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
       })}
 
       {catalog && catalog.total_artists > catalog.page_size && <Pager catalog={catalog} onPage={goTo} />}
+    </div>
+  );
+}
+
+function ChipFilter<T extends string>({ label, options, counts, hidden, onChange }: {
+  label: string;
+  options: Record<T, string>;
+  counts: Partial<Record<T, number>>;
+  hidden: Set<string>;
+  onChange: (hidden: Set<string>) => void;
+}) {
+  return (
+    <div className="chips" role="group" aria-label={label}>
+      {(Object.entries(options) as [T, string][]).map(([value, name]) => {
+        const on = !hidden.has(value);
+        return (
+          <label key={value} className={on ? "chip on" : "chip"}>
+            <input type="checkbox" checked={on} onChange={() => onChange(toggled(hidden, value))} />
+            {name}
+            <span className="chip-count">{counts[value] ?? 0}</span>
+          </label>
+        );
+      })}
     </div>
   );
 }

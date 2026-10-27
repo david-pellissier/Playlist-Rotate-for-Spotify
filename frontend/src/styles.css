@@ -713,8 +713,145 @@ span.success:not(.badge) {
 
 .toolbar {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(150px, 190px) 1fr auto;
+  grid-template-columns: minmax(200px, 280px) 1fr auto;
   gap: 8px;
+}
+
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.chip-count {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+label.chip.on .chip-count {
+  background: var(--surface);
+  color: var(--text-secondary);
+}
+
+.multi-select {
+  position: relative;
+  min-width: 0;
+}
+
+.multi-select-trigger {
+  justify-content: space-between;
+  width: 100%;
+  padding: 0 11px;
+  color: var(--text);
+  font-weight: 400;
+}
+
+.multi-select-trigger span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.multi-select-trigger svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.multi-select-trigger.filtered {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.multi-select-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: max(100%, 320px);
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.multi-select-actions {
+  display: flex;
+  justify-content: space-between;
+}
+
+.multi-select-options {
+  max-height: 320px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.multi-select-options li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+}
+
+.multi-select-options li.muted {
+  padding: 8px;
+}
+
+.multi-select-options li:hover {
+  background: var(--surface-muted);
+}
+
+.multi-select-options label {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 8px;
+  cursor: pointer;
+}
+
+.multi-select-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.multi-select-options small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.multi-select-options li > button {
+  visibility: hidden;
+}
+
+.multi-select-options li:hover > button,
+.multi-select-options li > button:focus-visible {
+  visibility: visible;
+}
+
+@media (max-width: 720px), (pointer: coarse) {
+  .multi-select-panel {
+    width: 100%;
+  }
+
+  .multi-select-options li > button {
+    visibility: visible;
+  }
 }
 
 .album {

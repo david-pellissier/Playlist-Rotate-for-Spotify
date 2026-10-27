@@ -143,6 +143,8 @@ class CatalogOut(BaseModel):
     albums: list[AlbumOut]
     total_tracks: int
     total_artists: int
+    status_counts: dict[str, int]
+    type_counts: dict[str, int]
     page: int
     page_size: int
 

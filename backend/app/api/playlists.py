@@ -1,4 +1,5 @@
 import math
+from collections import Counter
 from datetime import date
 from typing import Literal
 
@@ -21,14 +22,8 @@ from ..sync import known_artists
 router = APIRouter(prefix="/api/playlists")
 
 ARTISTS_PER_PAGE = 20
-STATUS_FILTERS = {
-    "all": lambda e, cutoff: True,
-    "eligible": lambda e, cutoff: e.eligible,
-    "new": lambda e, cutoff: e.is_new_release(cutoff),
-    "excluded": lambda e, cutoff: not e.eligible,
-    "cooldown": lambda e, cutoff: e.cooldown > 0,
-    "current": lambda e, cutoff: e.current,
-}
+SongStatus = Literal["available", "new", "cooldown", "current", "excluded"]
+ReleaseType = Literal["album", "single"]
 
 
 def get_playlist(playlist_id: int, session: Session = Depends(get_session)) -> Playlist:
@@ -117,9 +112,11 @@ def create_playlist_rule(data: RuleIn, playlist: Playlist = Depends(get_playlist
 
 @router.get("/{playlist_id}/catalog", response_model=CatalogOut)
 def read_catalog(
-    artist_id: str | None = None,
+    artist: list[str] = Query([]),
+    hide_artist: list[str] = Query([]),
+    hide_status: list[SongStatus] = Query([]),
+    hide_type: list[ReleaseType] = Query([]),
     q: str = "",
-    status: Literal["all", "eligible", "new", "excluded", "cooldown", "current"] = "all",
     page: int = Query(1, ge=1),
     playlist: Playlist = Depends(get_playlist),
     session: Session = Depends(get_session),
@@ -127,14 +124,24 @@ def read_catalog(
     artists, missing = known_artists(session, playlist.artist_names)
     catalog = load_catalog(session, playlist, [artist.id for artist in artists])
     names = {artist.id: artist.name for artist in artists}
-    matches = STATUS_FILTERS[status]
     cutoff = new_release_cutoff(playlist, utcnow())
     query = q.strip().casefold()
+    included, hidden_artists = set(artist), set(hide_artist)
+    hidden_statuses, hidden_types = set(hide_status), set(hide_type)
 
-    selected = {
-        current_artist: [e for e in catalog.get(current_artist, []) if matches(e, cutoff) and matches_query(e, query)]
-        for current_artist in ([artist_id] if artist_id else names)
-    }
+    shown_artists = [a for a in names if (not included or a in included) and a not in hidden_artists]
+    candidates = [
+        (entry, song_status(entry, cutoff), entry.album.album_type)
+        for current_artist in shown_artists
+        for entry in catalog[current_artist]
+        if matches_query(entry, query)
+    ]
+    status_counts = Counter(status for _, status, kind in candidates if kind not in hidden_types)
+    type_counts = Counter(kind for _, status, kind in candidates if status not in hidden_statuses)
+    selected: dict[str, list[Entry]] = {current_artist: [] for current_artist in shown_artists}
+    for entry, status, kind in candidates:
+        if status not in hidden_statuses and kind not in hidden_types:
+            selected[entry.album.artist_id].append(entry)
     matching_artists = [current_artist for current_artist, entries in selected.items() if entries]
     page = min(page, max(1, math.ceil(len(matching_artists) / ARTISTS_PER_PAGE)))
     start = (page - 1) * ARTISTS_PER_PAGE
@@ -174,6 +181,8 @@ def read_catalog(
         albums=list(albums.values()),
         total_tracks=sum(len(entries) for entries in selected.values()),
         total_artists=len(matching_artists),
+        status_counts=status_counts,
+        type_counts=type_counts,
         page=page,
         page_size=ARTISTS_PER_PAGE,
     )
@@ -264,6 +273,16 @@ async def rotate_playlist(
         skipped_artists=[artist.name for artist in plan.skipped_artists],
         order=[pick_out(pick) for pick in plan.order],
     )
+
+
+def song_status(entry: Entry, cutoff: date) -> str:
+    if entry.current:
+        return "current"
+    if not entry.eligible:
+        return "excluded"
+    if entry.cooldown:
+        return "cooldown"
+    return "new" if entry.is_new_release(cutoff) else "available"
 
 
 def matches_query(entry: Entry, query: str) -> bool:

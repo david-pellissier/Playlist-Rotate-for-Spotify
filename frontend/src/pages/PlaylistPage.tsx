@@ -115,7 +115,7 @@ export default function PlaylistPage() {
         <TabButton active={tab === "history"} onClick={() => setTab("history")}>History</TabButton>
       </div>
 
-      {tab === "songs" && <CatalogView playlistId={id} version={catalogVersion} />}
+      {tab === "songs" && <CatalogView playlistId={id} albumsOnly={playlist.albums_only} version={catalogVersion} />}
       {tab === "history" && <HistoryView playlistId={id} version={catalogVersion} />}
       {tab === "rotation" && (rotation
         ? <RotationView rotation={rotation} />
