@@ -244,6 +244,7 @@ async def rotate_playlist(
             for selection in plan.selections
         ],
         missing_artists=plan.missing_artists,
+        skipped_artists=[artist.name for artist in plan.skipped_artists],
         order=[pick_out(pick) for pick in plan.order],
     )
 

@@ -84,6 +84,8 @@ class Playlist(Base):
     spotify_playlist_id: Mapped[str | None]
     artists: Mapped[str] = mapped_column(Text, default="")
     songs_per_artist: Mapped[int] = mapped_column(default=3)
+    max_artists: Mapped[int | None]
+    artist_selection: Mapped[str] = mapped_column(default="fair")
     max_new_releases: Mapped[int] = mapped_column(default=1)
     update_interval_days: Mapped[int] = mapped_column(default=7)
     first_rotation_date: Mapped[date]
@@ -178,6 +180,14 @@ class RotationTrack(Base):
     source: Mapped[str]
 
     track: Mapped[Track] = relationship()
+
+
+class PlaylistArtist(Base):
+    __tablename__ = "playlist_artists"
+
+    playlist_id: Mapped[int] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), primary_key=True)
+    artist_id: Mapped[str] = mapped_column(ForeignKey("artists.id", ondelete="CASCADE"), primary_key=True)
+    last_picked_at: Mapped[datetime]
 
 
 class EnabledAlbum(Base):

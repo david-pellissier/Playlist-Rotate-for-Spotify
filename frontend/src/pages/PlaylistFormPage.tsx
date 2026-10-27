@@ -7,7 +7,7 @@ import RuleList from "../components/RuleList";
 import ScheduleFields from "../components/ScheduleFields";
 import { todayIso } from "../format";
 import { useAction, useLoader } from "../hooks";
-import type { Playlist, PlaylistInput, Rule, Settings } from "../types";
+import type { ArtistSelection, Playlist, PlaylistInput, Rule, Settings } from "../types";
 
 function defaults(settings: Settings): PlaylistInput {
   return {
@@ -15,6 +15,8 @@ function defaults(settings: Settings): PlaylistInput {
     spotify_target: "",
     artists: "",
     songs_per_artist: 3,
+    max_artists: null,
+    artist_selection: "fair",
     max_new_releases: 1,
     update_interval_days: 7,
     first_rotation_date: todayIso(),
@@ -100,7 +102,27 @@ export default function PlaylistFormPage() {
 
       <ScheduleFields form={form} isNew={!id} onChange={set} />
 
-      <Panel title="Rotation" description="How many songs each artist gets in every rotation." grid>
+      <Panel title="Rotation" description="Which artists and how many of their songs go into every rotation." grid>
+        <NumberField
+          label="Artists per rotation"
+          min={1}
+          value={form.max_artists}
+          onChange={(v) => set("max_artists", v)}
+          optional
+          placeholder="All artists"
+        />
+        <label>
+          Artist choice
+          <select
+            value={form.artist_selection}
+            disabled={form.max_artists === null}
+            onChange={(e) => set("artist_selection", e.target.value as ArtistSelection)}
+          >
+            <option value="fair">Fair: artists left out longest first</option>
+            <option value="random">Random</option>
+          </select>
+          <small>{form.max_artists === null ? "Used when artists per rotation is limited." : "Ties are broken at random."}</small>
+        </label>
         <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
         <NumberField
           label="Max new releases per artist"

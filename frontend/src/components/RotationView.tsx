@@ -15,6 +15,11 @@ export default function RotationView({ rotation }: { rotation: Rotation }) {
           ? <><strong>Dry run:</strong> nothing was changed. The next rotation would pick these {rotation.order.length} songs.</>
           : <><strong>Playlist updated</strong> with {rotation.order.length} songs.</>}
       </p>
+      {rotation.skipped_artists.length > 0 && (
+        <p className="muted">
+          <strong>Sitting out this rotation:</strong> {rotation.skipped_artists.join(", ")}
+        </p>
+      )}
       {rotation.missing_artists.length > 0 && (
         <p className="error"><strong>No exact Spotify match for:</strong> {rotation.missing_artists.join(", ")}</p>
       )}

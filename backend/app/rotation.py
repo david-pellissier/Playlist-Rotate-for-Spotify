@@ -4,11 +4,14 @@ import random
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from .catalog import Entry, load_catalog
-from .models import Artist, Playlist, PlaylistTrack, Rotation, RotationTrack, Settings, local_date, utcnow
+from .models import (
+    Album, Artist, Playlist, PlaylistArtist, PlaylistTrack, Rotation, RotationTrack, Settings, Track, local_date,
+    utcnow,
+)
 from .progress import Progress, track
 from .spotify import spotify
 from .sync import resolve_artists, sync_artists
@@ -40,6 +43,7 @@ class ArtistSelection:
 class RotationPlan:
     selections: list[ArtistSelection]
     missing_artists: list[str]
+    skipped_artists: list[Artist]
     order: list[Pick]
 
 
@@ -76,15 +80,33 @@ def select_tracks(entries: list[Entry], count: int, max_new: int, cutoff: date) 
     return picks
 
 
+def choose_artists(
+    playlist: Playlist, artists: list[Artist], catalog: dict[str, list[Entry]], last_picked: dict[str, datetime]
+) -> list[Artist]:
+    if not playlist.max_artists or len(artists) <= playlist.max_artists:
+        return artists
+    candidates = [artist for artist in artists if any(e.eligible for e in catalog[artist.id])]
+    random.shuffle(candidates)
+    if playlist.artist_selection == "fair":
+        candidates.sort(key=lambda artist: last_picked.get(artist.id, datetime.min))
+    chosen = set(candidates[:playlist.max_artists])
+    return [artist for artist in artists if artist in chosen]
+
+
 def plan_rotation(
     session: Session, playlist: Playlist, artists: list[Artist], missing: list[str], now: datetime
 ) -> RotationPlan:
     min_cooldown = session.get(Settings, 1).min_cooldown
     catalog = load_catalog(session, playlist, [artist.id for artist in artists])
     cutoff = new_release_cutoff(playlist, now)
+    last_picked = {
+        picked.artist_id: picked.last_picked_at
+        for picked in session.scalars(select(PlaylistArtist).where(PlaylistArtist.playlist_id == playlist.id))
+    }
+    chosen = choose_artists(playlist, artists, catalog, last_picked)
 
     selections = []
-    for artist in artists:
+    for artist in chosen:
         entries = catalog[artist.id]
         eligible = sum(e.eligible for e in entries)
         picks = select_tracks(entries, playlist.songs_per_artist, playlist.max_new_releases, cutoff)
@@ -97,15 +119,22 @@ def plan_rotation(
     order = [pick for selection in selections for pick in selection.picks]
     if playlist.shuffle:
         random.shuffle(order)
-    return RotationPlan(selections, missing, order)
+    skipped = [artist for artist in artists if artist not in chosen]
+    return RotationPlan(selections, missing, skipped, order)
 
 
 def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now: datetime, trigger: str) -> None:
+    picked_artists = [selection.artist.id for selection in plan.selections]
+    picked_tracks = select(Track.id).join(Track.album).where(Album.artist_id.in_(picked_artists))
     in_playlist = PlaylistTrack.playlist_id == playlist.id
     session.execute(update(PlaylistTrack).where(in_playlist).values(current=False))
     session.execute(
-        update(PlaylistTrack).where(in_playlist, PlaylistTrack.cooldown > 0).values(cooldown=PlaylistTrack.cooldown - 1)
+        update(PlaylistTrack)
+        .where(in_playlist, PlaylistTrack.cooldown > 0, PlaylistTrack.track_id.in_(picked_tracks))
+        .values(cooldown=PlaylistTrack.cooldown - 1)
     )
+    for artist_id in picked_artists:
+        session.merge(PlaylistArtist(playlist_id=playlist.id, artist_id=artist_id, last_picked_at=now))
 
     cooldowns = {selection.artist.id: selection.cooldown for selection in plan.selections}
     for pick in plan.order:

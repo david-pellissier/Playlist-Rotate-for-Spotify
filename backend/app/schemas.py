@@ -45,6 +45,8 @@ class PlaylistSettings(Schema):
     spotify_target: str = Field(min_length=1)
     artists: str
     songs_per_artist: int = Field(ge=1)
+    max_artists: int | None = Field(default=None, ge=1)
+    artist_selection: Literal["fair", "random"] = "fair"
     max_new_releases: int = Field(ge=0)
     update_interval_days: int = Field(ge=1)
     first_rotation_date: date
@@ -163,6 +165,7 @@ class RotationOut(BaseModel):
     dry_run: bool
     selections: list[SelectionOut]
     missing_artists: list[str]
+    skipped_artists: list[str]
     order: list[PickOut]
 
 

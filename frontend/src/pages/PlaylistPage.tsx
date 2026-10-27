@@ -55,6 +55,7 @@ export default function PlaylistPage() {
 
   if (error) return <p className="error">{error}</p>;
   if (!playlist) return <p className="muted">Loading…</p>;
+  const artistsPerRotation = Math.min(playlist.max_artists ?? Infinity, playlist.artist_names.length);
 
   return (
     <section className="stack">
@@ -84,8 +85,8 @@ export default function PlaylistPage() {
         <Stat label="Schedule" value={formatSchedule(playlist.update_interval_days, playlist.rotation_time)} />
         <Stat
           label="Songs per rotation"
-          value={String(playlist.artist_names.length * playlist.songs_per_artist)}
-          hint={`${playlist.artist_names.length} artists × ${playlist.songs_per_artist}`}
+          value={String(artistsPerRotation * playlist.songs_per_artist)}
+          hint={`${artistsPerRotation} of ${playlist.artist_names.length} artists × ${playlist.songs_per_artist}`}
         />
         <Stat label="Last rotation" value={formatDate(playlist.last_rotated_at)} />
       </div>

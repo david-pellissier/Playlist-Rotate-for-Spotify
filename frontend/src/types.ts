@@ -15,11 +15,15 @@ export interface Settings {
   refresh_lookback_days: number;
 }
 
+export type ArtistSelection = "fair" | "random";
+
 export interface PlaylistInput {
   name: string;
   spotify_target: string;
   artists: string;
   songs_per_artist: number;
+  max_artists: number | null;
+  artist_selection: ArtistSelection;
   max_new_releases: number;
   update_interval_days: number;
   first_rotation_date: string;
@@ -117,6 +121,7 @@ export interface Rotation {
   dry_run: boolean;
   selections: { artist_name: string; eligible: number; cooldown: number; picks: Pick[] }[];
   missing_artists: string[];
+  skipped_artists: string[];
   order: Pick[];
 }
 
