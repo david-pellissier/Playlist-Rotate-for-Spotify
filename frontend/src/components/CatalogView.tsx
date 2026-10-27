@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import { api } from "../api";
 import { formatDuration } from "../format";
 import InfoTip from "./InfoTip";
@@ -105,13 +105,19 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
         const open = isOpen(`artist:${artistName}`);
         return (
           <section key={artistName} className={open ? "artist-section" : "artist-section collapsed"}>
-            <header className="artist-header">
+            <header
+              className="artist-header"
+              style={artist?.image_url ? ({ "--artist-image": `url("${artist.image_url}")` } as CSSProperties) : undefined}
+            >
               <Toggle open={open} label={artistName} onClick={() => toggle(`artist:${artistName}`)} />
-              <h2>{artistName}</h2>
-              <small>
-                {filtering && `${songs} matching · `}
-                {artist && `${artist.eligible}/${artist.total} eligible · ${artist.on_cooldown} on cooldown`}
-              </small>
+              <ArtistAvatar name={artistName} image={artist?.image_url ?? null} />
+              <div className="artist-title">
+                <h2>{artistName}</h2>
+                <small>
+                  {filtering && `${songs} matching · `}
+                  {artist && `${artist.eligible}/${artist.total} eligible · ${artist.on_cooldown} on cooldown`}
+                </small>
+              </div>
             </header>
             {open && albums.map((album) => (
               <AlbumCard
@@ -137,6 +143,17 @@ function groupByArtist(albums: CatalogAlbum[]): [string, CatalogAlbum[]][] {
   const groups = new Map<string, CatalogAlbum[]>();
   for (const album of albums) groups.set(album.artist_name, [...(groups.get(album.artist_name) ?? []), album]);
   return [...groups];
+}
+
+function ArtistAvatar({ name, image }: { name: string; image: string | null }) {
+  if (image) return <img className="artist-avatar" src={image} alt="" loading="lazy" />;
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+  const hue = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 360;
+  return (
+    <span className="artist-avatar initials" style={{ "--avatar-hue": hue } as CSSProperties} aria-hidden="true">
+      {initials}
+    </span>
+  );
 }
 
 function Toggle({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {

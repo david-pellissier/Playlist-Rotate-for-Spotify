@@ -28,6 +28,7 @@ class Artist(Base):
     name: Mapped[str]
     synced_at: Mapped[datetime | None]
     singles_synced: Mapped[bool] = mapped_column(default=True)
+    image_url: Mapped[str | None]
 
     albums: Mapped[list["Album"]] = relationship(back_populates="artist", cascade="all, delete-orphan")
 

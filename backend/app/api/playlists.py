@@ -150,6 +150,7 @@ def read_catalog(
             ArtistOut(
                 id=artist.id,
                 name=artist.name,
+                image_url=artist.image_url or None,
                 total=len(catalog[artist.id]),
                 eligible=sum(e.eligible for e in catalog[artist.id]),
                 on_cooldown=sum(e.cooldown > 0 for e in catalog[artist.id]),

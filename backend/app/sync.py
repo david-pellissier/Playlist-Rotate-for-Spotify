@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from .models import Album, Artist, Playlist, Settings, Track, utcnow
 from .progress import Progress
-from .spotify import gather_all, parse_release_date, spotify
+from .spotify import RateLimitError, SpotifyError, gather_all, parse_release_date, pick_image, spotify
 
 log = logging.getLogger(__name__)
 
@@ -32,8 +32,9 @@ async def resolve_artists(session: Session, names: list[str], progress: Progress
             log.error("No exact Spotify match for artist %r", name)
         elif artist := session.get(Artist, data["id"]):
             artist.name = data["name"]
+            artist.image_url = pick_image(data.get("images"))
         else:
-            session.add(Artist(id=data["id"], name=data["name"]))
+            session.add(Artist(id=data["id"], name=data["name"], image_url=pick_image(data.get("images"))))
     session.commit()
     return known_artists(session, names)
 
@@ -55,6 +56,8 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
     progress.start("Updating catalog", len(stale))
     for artist in stale:
         progress.step = f"Updating catalog: {artist.name}"
+        if artist.image_url is None:
+            await _load_image(artist)
         new_albums = await _sync_artist(session, artist, lookback, singles[artist.id])
         artist.synced_at = utcnow()
         artist.singles_synced = singles[artist.id]
@@ -62,6 +65,15 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
         progress.done += 1
         if new_albums:
             log.info("Synced %s: %d new albums", artist.name, new_albums)
+
+
+async def _load_image(artist: Artist) -> None:
+    try:
+        artist.image_url = pick_image((await spotify.artist(artist.id)).get("images"))
+    except RateLimitError:
+        raise
+    except SpotifyError as error:
+        log.warning("Could not load the picture of %s: %s", artist.name, error)
 
 
 def _needs_sync(artist: Artist, now: datetime, with_singles: bool) -> bool:

@@ -48,6 +48,13 @@ async def gather_all[T](awaitables: Iterable[Awaitable[T]]) -> list[T]:
         raise
 
 
+def pick_image(images: list[dict] | None, min_size: int = 300) -> str:
+    if not images:
+        return ""
+    large_enough = [image for image in images if (image.get("width") or 0) >= min_size]
+    return min(large_enough, key=lambda image: image["width"])["url"] if large_enough else images[0]["url"]
+
+
 def parse_release_date(value: str) -> date:
     year, month, day = ([int(part) for part in value.split("-")] + [1, 1])[:3]
     return date(max(year, 1), max(month, 1), max(day, 1))
@@ -183,6 +190,9 @@ class Spotify:
         return next(
             (artist for artist in result["artists"]["items"] if artist and artist["name"].casefold() == wanted), None
         )
+
+    async def artist(self, artist_id: str) -> dict:
+        return await self.request("GET", f"/artists/{artist_id}")
 
     async def artist_albums(self, artist_id: str, groups: dict[str, date | None]) -> list[dict]:
         async def fetch_group(group: str, released_after: date | None) -> list[dict]:

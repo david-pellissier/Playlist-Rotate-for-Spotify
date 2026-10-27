@@ -94,6 +94,7 @@ export interface CatalogAlbum {
 export interface CatalogArtist {
   id: string;
   name: string;
+  image_url: string | null;
   total: number;
   eligible: number;
   on_cooldown: number;

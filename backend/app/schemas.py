@@ -129,6 +129,7 @@ class AlbumOut(BaseModel):
 class ArtistOut(BaseModel):
     id: str
     name: str
+    image_url: str | None
     total: int
     eligible: int
     on_cooldown: int

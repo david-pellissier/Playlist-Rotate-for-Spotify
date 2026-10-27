@@ -1338,17 +1338,72 @@ tbody tr.history-detail:hover td {
   position: sticky;
   top: 56px;
   z-index: 3;
+  isolation: isolate;
+  overflow: hidden;
+  contain: paint;
+  clip-path: inset(0 round 14px);
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  padding: 10px 0;
-  border-bottom: 2px solid var(--border-strong);
-  background: var(--bg);
+  gap: 12px;
+  padding: 10px 14px 10px 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
 }
 
-.artist-header h2 {
-  font-size: 18px;
+.artist-header::before {
+  content: "";
+  position: absolute;
+  inset: -40px;
+  z-index: -1;
+  background: var(--artist-image, none) center / cover;
+  filter: blur(24px) saturate(1.8) brightness(1.15);
+  opacity: var(--artist-glow, 0.3);
+}
+
+.artist-header::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--surface) var(--glow-veil, 45%), transparent) 0%,
+    color-mix(in srgb, var(--surface) 70%, transparent) 40%,
+    var(--surface) 90%
+  );
+}
+
+.artist-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.artist-title h2 {
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+
+.artist-avatar {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong), 0 6px 16px rgb(0 0 0 / 0.25);
+}
+
+.artist-avatar.initials {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, hsl(var(--avatar-hue) 55% 48%), hsl(calc(var(--avatar-hue) + 40) 60% 34%));
+  color: #fff;
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
 }
 
 .toggle {
@@ -1407,6 +1462,28 @@ tbody tr.history-detail:hover td {
 }
 
 .artist-section.collapsed .artist-header {
-  padding: 4px 0;
-  border-bottom-width: 1px;
+  position: static;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  --artist-glow: 0.2;
+}
+
+.artist-section.collapsed .artist-avatar {
+  width: 38px;
+  height: 38px;
+}
+
+.artist-section.collapsed .artist-avatar.initials {
+  font-size: 13px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .artist-header {
+    --artist-glow: 0.6;
+    --glow-veil: 10%;
+  }
+
+  .artist-section.collapsed .artist-header {
+    --artist-glow: 0.42;
+  }
 }
