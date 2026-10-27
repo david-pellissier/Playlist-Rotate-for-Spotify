@@ -76,9 +76,7 @@ def read_playlist(playlist: Playlist = Depends(get_playlist)):
 
 @router.put("/{playlist_id}", response_model=PlaylistOut)
 def update_playlist(data: PlaylistIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
-    if data.spotify_target != playlist.spotify_target:
-        playlist.spotify_playlist_id = None
-        playlist.cover = None
+    playlist.set_spotify_target(data.spotify_target)
     for field, value in data.model_dump().items():
         setattr(playlist, field, value)
     commit_or_conflict(session)

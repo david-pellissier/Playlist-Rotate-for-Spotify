@@ -42,8 +42,7 @@ def import_playlist(
         raise HTTPException(409, f'A playlist named "{settings["name"]}" already exists')
     if existing and on_conflict == "replace":
         playlist = existing
-        if playlist.spotify_target != settings["spotify_target"]:
-            playlist.spotify_playlist_id = None
+        playlist.set_spotify_target(settings["spotify_target"])
         playlist.rules.clear()
     else:
         if existing:

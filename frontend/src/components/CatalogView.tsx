@@ -328,7 +328,7 @@ function TrackStatus({ track }: { track: CatalogTrack }) {
       {track.new_release && <span className="badge info">New release</span>}
       {track.current && <span className="badge accent">In playlist</span>}
       {track.cooldown > 0 && <span className="badge warning">Cooldown {track.cooldown}</span>}
-      {!track.current && track.cooldown === 0 && <span className="badge success">Eligible</span>}
+      {!track.current && track.cooldown === 0 && <span className="badge success">Available</span>}
     </span>
   );
 }

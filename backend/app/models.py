@@ -109,6 +109,12 @@ class Playlist(Base):
         lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
     )
 
+    def set_spotify_target(self, target: str) -> None:
+        if target != self.spotify_target:
+            self.spotify_playlist_id = None
+            self.cover = None
+        self.spotify_target = target
+
     @property
     def cover_url(self) -> str | None:
         if self.cover is None or not self.cover.content_type:

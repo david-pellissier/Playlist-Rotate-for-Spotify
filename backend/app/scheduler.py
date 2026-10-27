@@ -10,6 +10,7 @@ from .covers import refresh_covers
 from .db import SessionLocal
 from .models import Playlist, utcnow
 from .rotation import rotate
+from .spotify import RateLimitError
 
 log = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ RETRY_AFTER = timedelta(hours=1)
 @dataclass(slots=True)
 class Failure:
     scheduled_for: datetime
-    retries: int
+    failed: int
     retry_at: datetime
     gave_up: bool = False
 
@@ -37,18 +38,27 @@ def is_due(playlist: Playlist, now: datetime) -> bool:
     return playlist.next_rotation_at <= now and (failure is None or failure.retry_at <= now)
 
 
-def record_failure(playlist: Playlist, now: datetime) -> None:
+def failed_so_far(playlist: Playlist) -> int:
     previous = current_failure(playlist)
-    retries = previous.retries + 1 if previous and not previous.gave_up else 0
-    if retries < env.scheduler_max_retries:
-        failures[playlist.id] = Failure(playlist.next_rotation_at, retries, now + RETRY_AFTER)
+    return previous.failed if previous and not previous.gave_up else 0
+
+
+def record_rate_limit(playlist: Playlist, error: RateLimitError) -> None:
+    failures[playlist.id] = Failure(playlist.next_rotation_at, failed_so_far(playlist), error.retry_at)
+    log.warning("Scheduled rotation of %s postponed: %s", playlist.name, error)
+
+
+def record_failure(playlist: Playlist, now: datetime) -> None:
+    failed = failed_so_far(playlist) + 1
+    if failed <= env.scheduler_max_retries:
+        failures[playlist.id] = Failure(playlist.next_rotation_at, failed, now + RETRY_AFTER)
         log.exception(
             "Scheduled rotation of %s failed, retry %d of %d in %d min",
-            playlist.name, retries + 1, env.scheduler_max_retries, RETRY_AFTER.total_seconds() // 60,
+            playlist.name, failed, env.scheduler_max_retries, RETRY_AFTER.total_seconds() // 60,
         )
     else:
         retry_at = playlist.next_rotation_after(now)
-        failures[playlist.id] = Failure(playlist.next_rotation_at, retries, retry_at, gave_up=True)
+        failures[playlist.id] = Failure(playlist.next_rotation_at, failed, retry_at, gave_up=True)
         local_retry_at = retry_at.replace(tzinfo=UTC).astimezone(env.timezone)
         log.exception(
             "Scheduled rotation of %s failed, giving up until the next scheduled rotation on %s",
@@ -65,6 +75,8 @@ async def rotate_due_playlists() -> None:
             try:
                 await rotate(session, playlist, dry_run=False, trigger="scheduled")
                 failures.pop(playlist.id, None)
+            except RateLimitError as error:
+                record_rate_limit(playlist, error)
             except Exception:
                 record_failure(playlist, now)
 

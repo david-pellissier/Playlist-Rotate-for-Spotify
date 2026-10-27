@@ -77,7 +77,7 @@ docker compose logs daemon
 | `SPOTIFY_REDIRECT_URI` | `http://127.0.0.1:8000/api/auth/callback` | Must match the Spotify app settings |
 | `TZ` | `UTC` | Timezone of the rotation times, e.g. `Europe/Zurich` |
 | `SCHEDULER_POLL_SECONDS` | `60` | How often due playlists are checked |
-| `SCHEDULER_MAX_RETRIES` | `1` | Hourly retries of a failed scheduled rotation |
+| `SCHEDULER_MAX_RETRIES` | `1` | Hourly retries of a failed scheduled rotation. A Spotify rate limit postpones it until the limit ends instead |
 | `WEB_BIND` | `127.0.0.1` | Address the web manager listens on |
 | `WEB_PORT` | `8000` | Port the web manager listens on |
 

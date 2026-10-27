@@ -58,6 +58,7 @@ async def sync_artists(session: Session, artists: list[Artist], progress: Progre
         progress.step = f"Updating catalog: {artist.name}"
         if artist.image_url is None:
             await _load_image(artist)
+            session.commit()
         new_albums = await _sync_artist(session, artist, lookback, singles[artist.id])
         artist.synced_at = utcnow()
         artist.singles_synced = singles[artist.id]
@@ -110,7 +111,7 @@ def _album(artist: Artist, data: dict, tracks: list[dict]) -> Album:
         name=data["name"],
         album_type=data["album_type"],
         release_date=parse_release_date(data["release_date"]),
-        image_url=data["images"][-1]["url"] if data.get("images") else None,
+        image_url=pick_image(data.get("images"), min_size=96) or None,
         tracks=[
             Track(
                 id=track["id"],
