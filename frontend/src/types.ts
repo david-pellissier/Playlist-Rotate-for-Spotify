@@ -104,6 +104,7 @@ export interface Catalog {
   missing_artists: string[];
   albums: CatalogAlbum[];
   total_tracks: number;
+  total_artists: number;
   page: number;
   page_size: number;
 }

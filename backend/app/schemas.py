@@ -139,6 +139,7 @@ class CatalogOut(BaseModel):
     missing_artists: list[str]
     albums: list[AlbumOut]
     total_tracks: int
+    total_artists: int
     page: int
     page_size: int
 

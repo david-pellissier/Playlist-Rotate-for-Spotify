@@ -1401,3 +1401,12 @@ tbody tr.history-detail:hover td {
     margin-left: auto;
   }
 }
+
+.artist-section.collapsed + .artist-section {
+  margin-top: 0;
+}
+
+.artist-section.collapsed .artist-header {
+  padding: 4px 0;
+  border-bottom-width: 1px;
+}

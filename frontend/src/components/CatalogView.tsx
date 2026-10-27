@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../api";
 import { formatDuration } from "../format";
 import InfoTip from "./InfoTip";
@@ -26,20 +26,23 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
   );
   const action = useAction();
 
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const albumKeys = catalog?.albums.map((album) => `album:${album.id}`) ?? [];
-  const allCollapsed = albumKeys.length > 0 && albumKeys.every((key) => collapsed.has(key));
+  const filtering = artistId !== "" || q.trim() !== "" || status !== "all";
+  const [allOpen, setAllOpen] = useState(false);
+  const [toggled, setToggled] = useState<Map<string, boolean>>(new Map());
+  const isOpen = (key: string) => toggled.get(key) ?? allOpen;
+
+  useEffect(() => {
+    setAllOpen(filtering);
+    setToggled(new Map());
+  }, [filtering, artistId, q, status]);
 
   function toggle(key: string) {
-    setCollapsed((current) => {
-      const next = new Set(current);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
+    setToggled((current) => new Map(current).set(key, !isOpen(key)));
   }
 
   function toggleAll() {
-    setCollapsed(allCollapsed ? new Set() : new Set(albumKeys));
+    setAllOpen(!allOpen);
+    setToggled(new Map());
   }
 
   function filter(apply: () => void) {
@@ -83,7 +86,7 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
           value={search}
           onChange={(e) => filter(() => setSearch(e.target.value))}
         />
-        <button disabled={!albumKeys.length} onClick={toggleAll}>{allCollapsed ? "Expand all" : "Collapse all"}</button>
+        <button disabled={!catalog?.albums.length} onClick={toggleAll}>{allOpen ? "Collapse all" : "Expand all"}</button>
       </div>
 
       {(error || action.error) && <p className="error">{error ?? action.error}</p>}
@@ -93,24 +96,28 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
           <InfoTip text="Refresh the catalog, or check that the names exactly match Spotify." />
         </p>
       )}
-      {catalog && catalog.total_tracks > 0 && <Pager catalog={catalog} onPage={setPage} />}
+      {catalog && catalog.total_tracks > 0 && <Pager catalog={catalog} onPage={goTo} />}
       {catalog?.total_tracks === 0 && <div className="empty-state">No songs match these filters.</div>}
 
       {groupByArtist(catalog?.albums ?? []).map(([artistName, albums]) => {
         const artist = catalog?.artists.find((a) => a.name === artistName);
-        const open = !collapsed.has(`artist:${artistName}`);
+        const songs = albums.reduce((count, album) => count + album.tracks.length, 0);
+        const open = isOpen(`artist:${artistName}`);
         return (
-          <section key={artistName} className="artist-section">
+          <section key={artistName} className={open ? "artist-section" : "artist-section collapsed"}>
             <header className="artist-header">
               <Toggle open={open} label={artistName} onClick={() => toggle(`artist:${artistName}`)} />
               <h2>{artistName}</h2>
-              {artist && <small>{artist.eligible}/{artist.total} eligible · {artist.on_cooldown} on cooldown</small>}
+              <small>
+                {filtering && `${songs} matching · `}
+                {artist && `${artist.eligible}/${artist.total} eligible · ${artist.on_cooldown} on cooldown`}
+              </small>
             </header>
             {open && albums.map((album) => (
               <AlbumCard
                 key={album.id}
                 album={album}
-                open={!collapsed.has(`album:${album.id}`)}
+                open={isOpen(`album:${album.id}`)}
                 busy={action.busy}
                 onToggleOpen={() => toggle(`album:${album.id}`)}
                 onToggleAlbum={() => toggleAlbum(album)}
@@ -121,7 +128,7 @@ export default function CatalogView({ playlistId, version }: { playlistId: numbe
         );
       })}
 
-      {catalog && catalog.total_tracks > catalog.page_size && <Pager catalog={catalog} onPage={goTo} />}
+      {catalog && catalog.total_artists > catalog.page_size && <Pager catalog={catalog} onPage={goTo} />}
     </div>
   );
 }
@@ -204,13 +211,16 @@ function AlbumCard({ album, open, busy, onToggleOpen, onToggleAlbum, onToggleTra
 }
 
 function Pager({ catalog, onPage }: { catalog: Catalog; onPage: (page: number) => void }) {
-  const pages = Math.max(1, Math.ceil(catalog.total_tracks / catalog.page_size));
+  const pages = Math.max(1, Math.ceil(catalog.total_artists / catalog.page_size));
   const first = (catalog.page - 1) * catalog.page_size + 1;
-  const last = Math.min(catalog.page * catalog.page_size, catalog.total_tracks);
+  const last = Math.min(catalog.page * catalog.page_size, catalog.total_artists);
   return (
     <div className="pager">
       <span className="muted">
-        {first}–{last} of {catalog.total_tracks} songs
+        {catalog.total_artists > catalog.page_size
+          ? `Artists ${first}–${last} of ${catalog.total_artists}`
+          : `${catalog.total_artists} ${catalog.total_artists === 1 ? "artist" : "artists"}`}
+        {` · ${catalog.total_tracks} ${catalog.total_tracks === 1 ? "song" : "songs"}`}
       </span>
       {pages > 1 && (
         <div className="row">

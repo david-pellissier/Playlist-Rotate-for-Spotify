@@ -20,7 +20,7 @@ from ..sync import known_artists
 
 router = APIRouter(prefix="/api/playlists")
 
-CATALOG_PAGE_SIZE = 250
+ARTISTS_PER_PAGE = 20
 STATUS_FILTERS = {
     "all": lambda e, cutoff: True,
     "eligible": lambda e, cutoff: e.eligible,
@@ -118,17 +118,19 @@ def read_catalog(
     cutoff = new_release_cutoff(playlist, utcnow())
     query = q.strip().casefold()
 
-    selected = [
-        entry
+    selected = {
+        current_artist: [e for e in catalog.get(current_artist, []) if matches(e, cutoff) and matches_query(e, query)]
         for current_artist in ([artist_id] if artist_id else names)
-        for entry in catalog.get(current_artist, [])
-        if matches(entry, cutoff) and matches_query(entry, query)
+    }
+    matching_artists = [current_artist for current_artist, entries in selected.items() if entries]
+    page = min(page, max(1, math.ceil(len(matching_artists) / ARTISTS_PER_PAGE)))
+    start = (page - 1) * ARTISTS_PER_PAGE
+    page_entries = [
+        entry for current_artist in matching_artists[start:start + ARTISTS_PER_PAGE] for entry in selected[current_artist]
     ]
-    page = min(page, max(1, math.ceil(len(selected) / CATALOG_PAGE_SIZE)))
-    start = (page - 1) * CATALOG_PAGE_SIZE
 
     albums: dict[str, AlbumOut] = {}
-    for entry in selected[start:start + CATALOG_PAGE_SIZE]:
+    for entry in page_entries:
         album = albums.get(entry.album.id) or albums.setdefault(entry.album.id, AlbumOut(
             id=entry.album.id,
             artist_name=names[entry.album.artist_id],
@@ -156,9 +158,10 @@ def read_catalog(
         ],
         missing_artists=missing,
         albums=list(albums.values()),
-        total_tracks=len(selected),
+        total_tracks=sum(len(entries) for entries in selected.values()),
+        total_artists=len(matching_artists),
         page=page,
-        page_size=CATALOG_PAGE_SIZE,
+        page_size=ARTISTS_PER_PAGE,
     )
 
 
