@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../api";
+import Icon from "../components/Icon";
 import ImportPlaylist from "../components/ImportPlaylist";
 import PlaylistCover from "../components/PlaylistCover";
 import PlaylistStatus from "../components/PlaylistStatus";
@@ -22,6 +23,11 @@ export default function PlaylistsPage() {
       <div className="page-header">
         <div className="page-title">
           <h1>Playlists</h1>
+          {!!playlists?.length && (
+            <p className="muted">
+              {playlists.length} {playlists.length === 1 ? "playlist" : "playlists"} · {playlists.filter((p) => p.enabled).length} on schedule
+            </p>
+          )}
         </div>
         <div className="actions">
           <ImportPlaylist onImported={(playlist) => navigate(`/playlists/${playlist.id}`)} />
@@ -40,47 +46,32 @@ export default function PlaylistsPage() {
       )}
 
       {!!playlists?.length && (
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Playlist</th>
-                <th className="hide-sm">Status</th>
-                <th className="numeric hide-sm">Artists</th>
-                <th className="hide-sm">Schedule</th>
-                <th className="hide-sm">Last rotation</th>
-                <th className="hide-sm">Next rotation</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {playlists.map((p) => (
-                <tr key={p.id}>
-                  <td>
-                    <div className="cell-playlist">
-                      <PlaylistCover name={p.name} url={p.cover_url} />
-                      <div className="cell-title">
-                        <Link to={`/playlists/${p.id}`}>{p.name}</Link>
-                        <small>{p.spotify_target}</small>
-                        <span className="show-sm"><PlaylistStatus enabled={p.enabled} error={p.last_error} /></span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="hide-sm"><PlaylistStatus enabled={p.enabled} error={p.last_error} /></td>
-                  <td className="numeric hide-sm">{p.artist_count}</td>
-                  <td className="nowrap hide-sm">{formatSchedule(p.update_interval_days, p.rotation_time)}</td>
-                  <td className="nowrap hide-sm">{formatDate(p.last_rotated_at)}</td>
-                  <td className="nowrap hide-sm">{p.enabled ? formatDate(p.next_rotation_at) : <span className="muted">—</span>}</td>
-                  <td className="cell-actions">
-                    <Link className="button small" to={`/playlists/${p.id}/edit`}>Edit</Link>
-                    <button className="small danger" disabled={action.busy} onClick={() => remove(p.id, p.name)}>
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="playlist-grid">
+          {playlists.map((p) => (
+            <article key={p.id} className="playlist-card">
+              <Link to={`/playlists/${p.id}`} className="playlist-card-link">
+                <PlaylistCover name={p.name} url={p.cover_url} size="fill" />
+                <div className="playlist-card-title">
+                  <h2>{p.name}</h2>
+                  {p.spotify_target !== p.name && <small>{p.spotify_target}</small>}
+                </div>
+              </Link>
+              <div className="playlist-card-meta">
+                <span><Icon name="users" />{p.artist_count} {p.artist_count === 1 ? "artist" : "artists"}</span>
+                <span><Icon name="repeat" />{formatSchedule(p.update_interval_days, p.rotation_time)}</span>
+                <span><Icon name="calendar" />{p.enabled ? `Next: ${formatDate(p.next_rotation_at)}` : "No scheduled rotation"}</span>
+              </div>
+              <div className="playlist-card-footer">
+                <PlaylistStatus enabled={p.enabled} error={p.last_error} />
+                <div className="actions">
+                  <Link className="button small" to={`/playlists/${p.id}/edit`}>Edit</Link>
+                  <button className="small ghost danger" disabled={action.busy} onClick={() => remove(p.id, p.name)}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </section>

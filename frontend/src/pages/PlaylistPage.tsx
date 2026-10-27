@@ -2,6 +2,7 @@ import { type CSSProperties, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
 import CatalogView from "../components/CatalogView";
+import Icon, { type IconName } from "../components/Icon";
 import HistoryView from "../components/HistoryView";
 import JobProgress, { useJobProgress } from "../components/JobProgress";
 import Menu from "../components/Menu";
@@ -66,7 +67,7 @@ export default function PlaylistPage() {
         style={playlist.cover_url ? ({ "--hero-image": `url("${playlist.cover_url}")` } as CSSProperties) : undefined}
       >
         <div className="hero-main">
-          <PlaylistCover name={playlist.name} url={playlist.cover_url} large />
+          <PlaylistCover name={playlist.name} url={playlist.cover_url} size="large" />
           <div className="page-title">
             <span className="hero-eyebrow">Playlist</span>
             <h1>
@@ -89,14 +90,15 @@ export default function PlaylistPage() {
       </div>
 
       <div className="stats">
-        <Stat label="Next rotation" value={playlist.enabled ? formatDate(playlist.next_rotation_at) : "Paused"} />
-        <Stat label="Schedule" value={formatSchedule(playlist.update_interval_days, playlist.rotation_time)} />
+        <Stat icon="calendar" label="Next rotation" value={playlist.enabled ? formatDate(playlist.next_rotation_at) : "Paused"} />
+        <Stat icon="repeat" label="Schedule" value={formatSchedule(playlist.update_interval_days, playlist.rotation_time)} />
         <Stat
+          icon="music"
           label="Songs per rotation"
           value={String(artistsPerRotation * playlist.songs_per_artist)}
           hint={`${artistsPerRotation} of ${playlist.artist_names.length} artists × ${playlist.songs_per_artist}`}
         />
-        <Stat label="Last rotation" value={formatDate(playlist.last_rotated_at)} />
+        <Stat icon="clock" label="Last rotation" value={formatDate(playlist.last_rotated_at)} />
       </div>
 
       {!playlist.enabled && (
@@ -129,12 +131,15 @@ export default function PlaylistPage() {
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ icon, label, value, hint }: { icon: IconName; label: string; value: string; hint?: string }) {
   return (
     <div className="stat">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
-      {hint && <small>{hint}</small>}
+      <span className="stat-icon"><Icon name={icon} size={20} /></span>
+      <div className="stat-text">
+        <span className="stat-label">{label}</span>
+        <span className="stat-value">{value}</span>
+        {hint && <small>{hint}</small>}
+      </div>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import PlaylistFormPage from "./pages/PlaylistFormPage";
 import PlaylistPage from "./pages/PlaylistPage";
 import PlaylistsPage from "./pages/PlaylistsPage";
 import SettingsPage from "./pages/SettingsPage";
+import "@fontsource-variable/inter";
 import "./styles.css";
 
 function BrandMark() {
