@@ -1709,10 +1709,8 @@ tbody tr.history-detail:hover td {
 
 .playlist-hero {
   position: relative;
+  z-index: 4;
   isolation: isolate;
-  overflow: hidden;
-  contain: paint;
-  clip-path: inset(0 round 18px);
   align-items: flex-end;
   padding: 20px;
   border: 1px solid var(--border);
@@ -1721,7 +1719,17 @@ tbody tr.history-detail:hover td {
   box-shadow: var(--shadow-sm);
 }
 
-.playlist-hero::before {
+.hero-glow {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  contain: paint;
+  clip-path: inset(0 round 17px);
+  border-radius: inherit;
+}
+
+.hero-glow::before {
   content: "";
   position: absolute;
   inset: -60px;
@@ -1731,11 +1739,10 @@ tbody tr.history-detail:hover td {
   opacity: var(--hero-glow, 0.3);
 }
 
-.playlist-hero::after {
+.hero-glow::after {
   content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
   background: linear-gradient(
     100deg,
     color-mix(in srgb, var(--surface) var(--glow-veil, 45%), transparent) 0%,

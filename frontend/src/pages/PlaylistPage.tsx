@@ -66,6 +66,7 @@ export default function PlaylistPage() {
         className="page-header playlist-hero"
         style={playlist.cover_url ? ({ "--hero-image": `url("${playlist.cover_url}")` } as CSSProperties) : undefined}
       >
+        <div className="hero-glow" aria-hidden="true" />
         <div className="hero-main">
           <PlaylistCover name={playlist.name} url={playlist.cover_url} size="large" />
           <div className="page-title">
