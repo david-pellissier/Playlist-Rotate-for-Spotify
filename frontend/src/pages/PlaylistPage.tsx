@@ -1,6 +1,7 @@
 import { type CSSProperties, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "../api";
+import { useCoverAccent } from "../coverAccent";
 import CatalogView from "../components/CatalogView";
 import Icon, { type IconName } from "../components/Icon";
 import HistoryView from "../components/HistoryView";
@@ -18,6 +19,7 @@ type Tab = "songs" | "rotation" | "history";
 export default function PlaylistPage() {
   const id = Number(useParams().id);
   const { data: playlist, error, reload } = useLoader(() => api.playlist(id), [id]);
+  const accent = useCoverAccent(playlist?.cover_url ?? null);
   const [tab, setTab] = useState<Tab>("songs");
   const [rotation, setRotation] = useState<Rotation>();
   const [catalogVersion, setCatalogVersion] = useState(0);
@@ -60,7 +62,7 @@ export default function PlaylistPage() {
   const artistsPerRotation = Math.min(playlist.max_artists ?? Infinity, playlist.entries.length);
 
   return (
-    <section className="stack">
+    <section className={accent ? "stack themed" : "stack"} style={accent}>
       <Link to="/" className="back-link">← Playlists</Link>
       <div
         className="page-header playlist-hero"

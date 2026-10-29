@@ -1905,3 +1905,21 @@ tbody tr.history-detail:hover td {
     align-items: flex-start;
   }
 }
+
+.themed {
+  --accent: hsl(var(--cover-h) var(--cover-s) var(--cover-light-l));
+  --accent-hover: hsl(var(--cover-h) var(--cover-s) calc(var(--cover-light-l) - 6%));
+  --accent-soft: hsl(var(--cover-h) 70% 94%);
+  --accent-contrast: #ffffff;
+  --focus-ring: 0 0 0 3px hsl(var(--cover-h) var(--cover-s) var(--cover-light-l) / 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  .themed {
+    --accent: hsl(var(--cover-h) var(--cover-s) var(--cover-dark-l));
+    --accent-hover: hsl(var(--cover-h) var(--cover-s) calc(var(--cover-dark-l) + 8%));
+    --accent-soft: hsl(var(--cover-h) var(--cover-s) var(--cover-dark-l) / 0.14);
+    --accent-contrast: #0b0d12;
+    --focus-ring: 0 0 0 3px hsl(var(--cover-h) var(--cover-s) var(--cover-dark-l) / 0.32);
+  }
+}
