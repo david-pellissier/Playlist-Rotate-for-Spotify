@@ -31,6 +31,10 @@ class SpotifyError(Exception):
     pass
 
 
+class NotFoundError(SpotifyError):
+    pass
+
+
 class RateLimitError(SpotifyError):
     def __init__(self, retry_at: datetime) -> None:
         self.retry_at = retry_at
@@ -177,7 +181,8 @@ class Spotify:
                     await asyncio.sleep(2 ** attempt)
                     continue
                 if response.is_error:
-                    raise SpotifyError(f"{method} {url} failed ({response.status_code}): {response.text}")
+                    error = NotFoundError if response.status_code in (400, 404) else SpotifyError
+                    raise error(f"{method} {url} failed ({response.status_code}): {response.text}")
                 return response.json() if response.content else None
         raise SpotifyError(f"{method} {url} failed after {MAX_ATTEMPTS} attempts ({problem})")
 

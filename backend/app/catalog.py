@@ -1,12 +1,12 @@
 import re
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import InstrumentedAttribute, Session
 
-from .models import Album, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track
+from .models import Album, Artist, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track
 
 ALBUM_TYPE_RANK = {"album": 0, "single": 1, "compilation": 2}
 FEATURING = re.compile(r"\s*[(\[](?:feat|ft|with)\b.*?[)\]]", re.IGNORECASE)
@@ -40,9 +40,18 @@ class Status:
 
 
 @dataclass(slots=True)
+class Scope:
+    artists: list[Artist]
+    missing: list[str] = field(default_factory=list)
+    linked: dict[str, set[str]] = field(default_factory=dict)
+    linked_tracks: set[str] = field(default_factory=set)
+
+
+@dataclass(slots=True)
 class Entry:
     track: Track
     album: Album
+    artist_id: str
     album_status: Status
     status: Status
     state: PlaylistTrack | None
@@ -95,6 +104,12 @@ def active_rules(session: Session, playlist: Playlist) -> list[Rule]:
     return [*global_rules, *playlist.rules]
 
 
+def song_artist_id(track: Track, album: Album) -> str:
+    if album.album_type == "compilation" and track.artist_ids:
+        return track.artist_ids[0]
+    return album.artist_id
+
+
 def album_automatic_exclusion(session: Session, playlist: Playlist, album: Album) -> str | None:
     return _album_exclusion(playlist, RuleMatcher(active_rules(session, playlist)), album)
 
@@ -106,8 +121,9 @@ def _album_exclusion(playlist: Playlist, matcher: RuleMatcher, album: Album) -> 
 
 
 def load_catalog(
-    session: Session, playlist: Playlist, artist_ids: list[str], linked: dict[str, set[str]]
+    session: Session, playlist: Playlist, scope: Scope, artist_ids: list[str] | None = None
 ) -> dict[str, list[Entry]]:
+    artist_ids = artist_ids or [artist.id for artist in scope.artists]
     matcher = RuleMatcher(active_rules(session, playlist))
     states = {
         state.track_id: state
@@ -119,31 +135,32 @@ def load_catalog(
     rows = session.execute(
         select(Track, Album)
         .join(Track.album)
-        .where(Album.artist_id.in_(artist_ids))
+        .where(or_(Album.artist_id.in_(artist_ids), Track.id.in_(scope.linked_tracks)))
         .order_by(Album.release_date.desc(), Album.id, Track.disc_number, Track.track_number)
     )
 
     catalog: dict[str, list[Entry]] = {artist_id: [] for artist_id in artist_ids}
-    album_statuses: dict[str, Status] = {}
+    album_statuses: dict[tuple[str, bool], Status] = {}
     for track, album in rows:
-        allowed = linked.get(album.artist_id)
-        if allowed is not None and track.id not in allowed:
+        artist_id = song_artist_id(track, album)
+        allowed = scope.linked.get(artist_id)
+        if artist_id not in catalog or (allowed is not None and track.id not in allowed):
             continue
         unfiltered = allowed is not None
-        if album.id not in album_statuses:
-            album_statuses[album.id] = _album_status(
+        if (album.id, unfiltered) not in album_statuses:
+            album_statuses[album.id, unfiltered] = _album_status(
                 playlist, matcher, album, disabled_albums, enabled_albums, unfiltered
             )
-        album_status = album_statuses[album.id]
+        album_status = album_statuses[album.id, unfiltered]
         state = states.get(track.id)
         status = _track_status(
             playlist, matcher, track, album, state, album_status, track.id in enabled_tracks, unfiltered
         )
-        catalog[album.artist_id].append(Entry(track, album, album_status, status, state, album.release_date))
+        catalog[artist_id].append(Entry(track, album, artist_id, album_status, status, state, album.release_date))
 
     if playlist.exclude_duplicates:
         for artist_id, entries in catalog.items():
-            if artist_id not in linked:
+            if artist_id not in scope.linked:
                 _mark_duplicates(entries, enabled_tracks)
     return catalog
 

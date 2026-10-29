@@ -162,7 +162,7 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
             </header>
             {open && albums.map((album) => (
               <AlbumCard
-                key={album.id}
+                key={`${artistName}:${album.id}`}
                 album={album}
                 open={isOpen(`album:${album.id}`)}
                 busy={action.busy}

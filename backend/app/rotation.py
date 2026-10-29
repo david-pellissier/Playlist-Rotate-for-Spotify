@@ -7,14 +7,14 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from .catalog import Entry, load_catalog
+from .catalog import Entry, Scope, load_catalog
 from .models import (
-    Album, Artist, Playlist, PlaylistArtist, PlaylistTrack, Rotation, RotationTrack, Settings, Track, local_date,
-    utcnow,
+    Artist, Playlist, PlaylistArtist, PlaylistTrack, Rotation, RotationTrack, Settings, local_date, utcnow,
 )
 from .progress import Progress, track
 from .spotify import spotify
-from .sync import Scope, playlist_scope, resolve_artists, sync_artists, sync_links
+from .links import playlist_scope, sync_links
+from .sync import resolve_artists, sync_artists
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +37,7 @@ class ArtistSelection:
     eligible: int
     cooldown: int
     picks: list[Pick]
+    pool: list[str]
 
 
 @dataclass(slots=True)
@@ -96,7 +97,7 @@ def choose_artists(
 def plan_rotation(session: Session, playlist: Playlist, scope: Scope, now: datetime) -> RotationPlan:
     artists = scope.artists
     min_cooldown = session.get(Settings, 1).min_cooldown
-    catalog = load_catalog(session, playlist, [artist.id for artist in artists], scope.linked)
+    catalog = load_catalog(session, playlist, scope)
     cutoff = new_release_cutoff(playlist, now)
     last_picked = {
         picked.artist_id: picked.last_picked_at
@@ -112,7 +113,11 @@ def plan_rotation(session: Session, playlist: Playlist, scope: Scope, now: datet
         if len(picks) < playlist.songs_per_artist:
             log.warning("%s: only %d eligible tracks for %s", playlist.name, len(picks), artist.name)
         selections.append(ArtistSelection(
-            artist, eligible, artist_cooldown(eligible, playlist.songs_per_artist, min_cooldown), picks
+            artist,
+            eligible,
+            artist_cooldown(eligible, playlist.songs_per_artist, min_cooldown),
+            picks,
+            [entry.track.id for entry in entries],
         ))
 
     order = [pick for selection in selections for pick in selection.picks]
@@ -124,7 +129,7 @@ def plan_rotation(session: Session, playlist: Playlist, scope: Scope, now: datet
 
 def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now: datetime, trigger: str) -> None:
     picked_artists = [selection.artist.id for selection in plan.selections]
-    picked_tracks = select(Track.id).join(Track.album).where(Album.artist_id.in_(picked_artists))
+    picked_tracks = [track_id for selection in plan.selections for track_id in selection.pool]
     in_playlist = PlaylistTrack.playlist_id == playlist.id
     session.execute(update(PlaylistTrack).where(in_playlist).values(current=False))
     session.execute(
@@ -142,7 +147,7 @@ def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now
             state = PlaylistTrack(playlist_id=playlist.id, track_id=pick.entry.track.id, disabled=False, play_count=0)
             session.add(state)
         state.current = True
-        state.cooldown = cooldowns[pick.entry.album.artist_id]
+        state.cooldown = cooldowns[pick.entry.artist_id]
         state.play_count += 1
 
     playlist.last_rotated_at = now

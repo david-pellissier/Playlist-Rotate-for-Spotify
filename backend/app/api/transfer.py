@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from ..db import get_session
 from ..models import Playlist, Rule
 from ..schemas import PlaylistExport, PlaylistOut, PlaylistSettings, RuleIn
-from .playlists import get_playlist
+from .playlists import get_playlist, playlist_out
 
 router = APIRouter(prefix="/api/playlists")
 
@@ -56,7 +56,7 @@ def import_playlist(
     playlist.disabled_rule_ids = matching_global_rules(session, data.disabled_global_rules)
     playlist.rules.extend(Rule(**rule.model_dump()) for rule in data.rules)
     session.commit()
-    return playlist
+    return playlist_out(session, playlist)
 
 
 def copy_name(session: Session, name: str) -> str:

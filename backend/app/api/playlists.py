@@ -8,7 +8,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from ..catalog import Entry, album_automatic_exclusion, load_catalog
+from ..catalog import Entry, album_automatic_exclusion, load_catalog, song_artist_id
 from ..db import get_session
 from ..models import Album, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track, utcnow
 from ..progress import running_jobs
@@ -17,13 +17,26 @@ from ..schemas import (
     AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
     EnabledIn, RotationOut, RuleIn, RuleOut, SelectionOut, TrackOut,
 )
-from ..sync import playlist_scope
+from ..links import playlist_scope
 
 router = APIRouter(prefix="/api/playlists")
 
 ARTISTS_PER_PAGE = 20
 SongStatus = Literal["available", "new", "cooldown", "current", "excluded"]
 ReleaseType = Literal["album", "single"]
+
+
+def release_type(entry: Entry) -> str:
+    return "single" if entry.album.album_type == "single" else "album"
+
+
+def artist_count(session: Session, playlist: Playlist) -> int:
+    scope = playlist_scope(session, playlist)
+    return len(scope.artists) + len(scope.missing)
+
+
+def playlist_out(session: Session, playlist: Playlist) -> PlaylistOut:
+    return PlaylistOut.model_validate(playlist).model_copy(update={"artist_count": artist_count(session, playlist)})
 
 
 def get_playlist(playlist_id: int, session: Session = Depends(get_session)) -> Playlist:
@@ -48,7 +61,7 @@ def list_playlists(session: Session = Depends(get_session)):
             id=p.id,
             name=p.name,
             spotify_target=p.spotify_target,
-            artist_count=len(p.entries),
+            artist_count=artist_count(session, p),
             enabled=p.enabled,
             update_interval_days=p.update_interval_days,
             rotation_time=p.rotation_time,
@@ -66,12 +79,12 @@ def create_playlist(data: PlaylistIn, session: Session = Depends(get_session)):
     playlist = Playlist(**data.model_dump())
     session.add(playlist)
     commit_or_conflict(session)
-    return playlist
+    return playlist_out(session, playlist)
 
 
 @router.get("/{playlist_id}", response_model=PlaylistOut)
-def read_playlist(playlist: Playlist = Depends(get_playlist)):
-    return playlist
+def read_playlist(playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
+    return playlist_out(session, playlist)
 
 
 @router.put("/{playlist_id}", response_model=PlaylistOut)
@@ -80,7 +93,7 @@ def update_playlist(data: PlaylistIn, playlist: Playlist = Depends(get_playlist)
     for field, value in data.model_dump().items():
         setattr(playlist, field, value)
     commit_or_conflict(session)
-    return playlist
+    return playlist_out(session, playlist)
 
 
 @router.get("/{playlist_id}/cover")
@@ -121,7 +134,7 @@ def read_catalog(
 ):
     scope = playlist_scope(session, playlist)
     artists = scope.artists
-    catalog = load_catalog(session, playlist, [artist.id for artist in artists], scope.linked)
+    catalog = load_catalog(session, playlist, scope)
     names = {artist.id: artist.name for artist in artists}
     cutoff = new_release_cutoff(playlist, utcnow())
     query = q.strip().casefold()
@@ -130,7 +143,7 @@ def read_catalog(
 
     shown_artists = [a for a in names if (not included or a in included) and a not in hidden_artists]
     candidates = [
-        (entry, song_status(entry, cutoff), entry.album.album_type)
+        (entry, song_status(entry, cutoff), release_type(entry))
         for current_artist in shown_artists
         for entry in catalog[current_artist]
         if matches_query(entry, query)
@@ -140,7 +153,7 @@ def read_catalog(
     selected: dict[str, list[Entry]] = {current_artist: [] for current_artist in shown_artists}
     for entry, status, kind in candidates:
         if status not in hidden_statuses and kind not in hidden_types:
-            selected[entry.album.artist_id].append(entry)
+            selected[entry.artist_id].append(entry)
     matching_artists = [current_artist for current_artist, entries in selected.items() if entries]
     page = min(page, max(1, math.ceil(len(matching_artists) / ARTISTS_PER_PAGE)))
     start = (page - 1) * ARTISTS_PER_PAGE
@@ -148,11 +161,12 @@ def read_catalog(
         entry for current_artist in matching_artists[start:start + ARTISTS_PER_PAGE] for entry in selected[current_artist]
     ]
 
-    albums: dict[str, AlbumOut] = {}
+    albums: dict[tuple[str, str], AlbumOut] = {}
     for entry in page_entries:
-        album = albums.get(entry.album.id) or albums.setdefault(entry.album.id, AlbumOut(
+        key = (entry.artist_id, entry.album.id)
+        album = albums.get(key) or albums.setdefault(key, AlbumOut(
             id=entry.album.id,
-            artist_name=names[entry.album.artist_id],
+            artist_name=names[entry.artist_id],
             name=entry.album.name,
             album_type=entry.album.album_type,
             release_date=entry.album.release_date,
@@ -197,8 +211,9 @@ def set_album_enabled(
     key = (playlist.id, album_id)
     delete_if_present(session, DisabledAlbum, key)
     delete_if_present(session, EnabledAlbum, key)
-    linked = album.artist_id in playlist_scope(session, playlist).linked
-    excluded_by_rule = not linked and album_automatic_exclusion(session, playlist, album) is not None
+    linked = playlist_scope(session, playlist).linked
+    unfiltered = any(song_artist_id(track, album) in linked for track in album.tracks)
+    excluded_by_rule = not unfiltered and album_automatic_exclusion(session, playlist, album) is not None
     if data.enabled and excluded_by_rule:
         session.add(EnabledAlbum(playlist_id=playlist.id, album_id=album_id))
     elif not data.enabled and not excluded_by_rule:
@@ -213,9 +228,9 @@ def set_track_enabled(
     track = session.get(Track, track_id)
     if track is None:
         raise HTTPException(404, "Track not found")
-    artist_id = track.album.artist_id
-    catalog = load_catalog(session, playlist, [artist_id], playlist_scope(session, playlist).linked)
-    entry = next((e for e in catalog[artist_id] if e.track.id == track_id), None)
+    artist_id = song_artist_id(track, track.album)
+    catalog = load_catalog(session, playlist, playlist_scope(session, playlist), [artist_id])
+    entry = next((e for e in catalog.get(artist_id, []) if e.track.id == track_id), None)
     if entry is None:
         raise HTTPException(404, "Track not in this playlist")
     excluded_automatically = entry.status.automatic is not None
