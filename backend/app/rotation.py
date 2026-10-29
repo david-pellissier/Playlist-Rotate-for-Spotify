@@ -14,7 +14,7 @@ from .models import (
 )
 from .progress import Progress, track
 from .spotify import spotify
-from .sync import resolve_artists, sync_artists
+from .sync import Scope, playlist_scope, resolve_artists, sync_artists, sync_links
 
 log = logging.getLogger(__name__)
 
@@ -93,11 +93,10 @@ def choose_artists(
     return [artist for artist in artists if artist in chosen]
 
 
-def plan_rotation(
-    session: Session, playlist: Playlist, artists: list[Artist], missing: list[str], now: datetime
-) -> RotationPlan:
+def plan_rotation(session: Session, playlist: Playlist, scope: Scope, now: datetime) -> RotationPlan:
+    artists = scope.artists
     min_cooldown = session.get(Settings, 1).min_cooldown
-    catalog = load_catalog(session, playlist, [artist.id for artist in artists])
+    catalog = load_catalog(session, playlist, [artist.id for artist in artists], scope.linked)
     cutoff = new_release_cutoff(playlist, now)
     last_picked = {
         picked.artist_id: picked.last_picked_at
@@ -120,7 +119,7 @@ def plan_rotation(
     if playlist.shuffle:
         random.shuffle(order)
     skipped = [artist for artist in artists if artist not in chosen]
-    return RotationPlan(selections, missing, skipped, order)
+    return RotationPlan(selections, scope.missing, skipped, order)
 
 
 def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now: datetime, trigger: str) -> None:
@@ -159,12 +158,12 @@ def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now
     ))
 
 
-async def _refresh_catalog(
-    session: Session, playlist: Playlist, progress: Progress
-) -> tuple[list[Artist], list[str]]:
-    artists, missing = await resolve_artists(session, playlist.artist_names, progress)
-    await sync_artists(session, artists, progress)
-    return artists, missing
+async def _refresh_catalog(session: Session, playlist: Playlist, progress: Progress) -> Scope:
+    await resolve_artists(session, playlist.artist_names, progress)
+    await sync_links(session, playlist, progress)
+    scope = playlist_scope(session, playlist)
+    await sync_artists(session, [artist for artist in scope.artists if artist.id not in scope.linked], progress)
+    return scope
 
 
 async def refresh_catalog(session: Session, playlist: Playlist) -> None:
@@ -183,10 +182,10 @@ async def _rotate(
     session: Session, playlist: Playlist, dry_run: bool, trigger: str, progress: Progress
 ) -> RotationPlan:
     try:
-        artists, missing = await _refresh_catalog(session, playlist, progress)
+        scope = await _refresh_catalog(session, playlist, progress)
         progress.start("Selecting tracks")
         now = utcnow()
-        plan = plan_rotation(session, playlist, artists, missing, now)
+        plan = plan_rotation(session, playlist, scope, now)
         if dry_run:
             return plan
         if not plan.order:

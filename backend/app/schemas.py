@@ -67,7 +67,7 @@ class PlaylistIn(PlaylistSettings):
 
 class PlaylistOut(PlaylistIn):
     id: int
-    artist_names: list[str]
+    entries: list[str]
     spotify_playlist_id: str | None
     last_rotated_at: UtcDatetime | None
     next_rotation_at: UtcDatetime

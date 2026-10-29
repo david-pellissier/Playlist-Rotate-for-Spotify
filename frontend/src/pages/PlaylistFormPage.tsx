@@ -100,7 +100,7 @@ export default function PlaylistFormPage() {
         <label>
           <span>
             Artists
-            <InfoTip text="One per line, with the exact Spotify name. Lines starting with # are ignored." />
+            <InfoTip text="One per line: an exact Spotify artist name, or a Spotify artist, album or song link. Linked albums and songs are never filtered, and their artist isn't checked for new releases. Lines starting with # are ignored." />
           </span>
           <textarea rows={12} value={form.artists} onChange={(e) => set("artists", e.target.value)} />
         </label>

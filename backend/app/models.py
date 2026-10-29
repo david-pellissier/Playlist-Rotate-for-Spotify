@@ -1,4 +1,5 @@
 import math
+import re
 from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import JSON, ForeignKey, LargeBinary, String, Text
@@ -11,6 +12,7 @@ DEFAULT_KEYWORDS = (
     "live", "remix", "remixed", "mix", "instrumental", "acoustic",
     "remaster", "remastered", "demo", "piano", "intro", "outro",
 )
+SPOTIFY_LINK = re.compile(r"(?:open\.spotify\.com/(?:intl-[\w-]+/)?|spotify:)(artist|album|track)[/:]([A-Za-z0-9]{22})")
 
 
 def utcnow() -> datetime:
@@ -42,6 +44,7 @@ class Album(Base):
     album_type: Mapped[str]
     release_date: Mapped[date]
     image_url: Mapped[str | None]
+    complete: Mapped[bool] = mapped_column(default=True)
 
     artist: Mapped[Artist] = relationship(back_populates="albums")
     tracks: Mapped[list["Track"]] = relationship(back_populates="album", cascade="all, delete-orphan")
@@ -122,9 +125,17 @@ class Playlist(Base):
         return f"/api/playlists/{self.id}/cover?v={self.cover.updated_at:%Y%m%d%H%M%S%f}"
 
     @property
-    def artist_names(self) -> list[str]:
+    def entries(self) -> list[str]:
         lines = (line.strip() for line in self.artists.splitlines())
         return list(dict.fromkeys(line for line in lines if line and not line.startswith("#")))
+
+    @property
+    def artist_names(self) -> list[str]:
+        return [entry for entry in self.entries if not SPOTIFY_LINK.search(entry)]
+
+    @property
+    def links(self) -> list[tuple[str, str, str]]:
+        return [(entry, *match.groups()) for entry in self.entries if (match := SPOTIFY_LINK.search(entry))]
 
     @property
     def next_rotation_at(self) -> datetime:

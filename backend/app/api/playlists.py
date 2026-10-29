@@ -17,7 +17,7 @@ from ..schemas import (
     AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
     EnabledIn, RotationOut, RuleIn, RuleOut, SelectionOut, TrackOut,
 )
-from ..sync import known_artists
+from ..sync import playlist_scope
 
 router = APIRouter(prefix="/api/playlists")
 
@@ -48,7 +48,7 @@ def list_playlists(session: Session = Depends(get_session)):
             id=p.id,
             name=p.name,
             spotify_target=p.spotify_target,
-            artist_count=len(p.artist_names),
+            artist_count=len(p.entries),
             enabled=p.enabled,
             update_interval_days=p.update_interval_days,
             rotation_time=p.rotation_time,
@@ -119,8 +119,9 @@ def read_catalog(
     playlist: Playlist = Depends(get_playlist),
     session: Session = Depends(get_session),
 ):
-    artists, missing = known_artists(session, playlist.artist_names)
-    catalog = load_catalog(session, playlist, [artist.id for artist in artists])
+    scope = playlist_scope(session, playlist)
+    artists = scope.artists
+    catalog = load_catalog(session, playlist, [artist.id for artist in artists], scope.linked)
     names = {artist.id: artist.name for artist in artists}
     cutoff = new_release_cutoff(playlist, utcnow())
     query = q.strip().casefold()
@@ -175,7 +176,7 @@ def read_catalog(
             )
             for artist in artists
         ],
-        missing_artists=missing,
+        missing_artists=scope.missing,
         albums=list(albums.values()),
         total_tracks=sum(len(entries) for entries in selected.values()),
         total_artists=len(matching_artists),
@@ -196,7 +197,8 @@ def set_album_enabled(
     key = (playlist.id, album_id)
     delete_if_present(session, DisabledAlbum, key)
     delete_if_present(session, EnabledAlbum, key)
-    excluded_by_rule = album_automatic_exclusion(session, playlist, album) is not None
+    linked = album.artist_id in playlist_scope(session, playlist).linked
+    excluded_by_rule = not linked and album_automatic_exclusion(session, playlist, album) is not None
     if data.enabled and excluded_by_rule:
         session.add(EnabledAlbum(playlist_id=playlist.id, album_id=album_id))
     elif not data.enabled and not excluded_by_rule:
@@ -212,7 +214,10 @@ def set_track_enabled(
     if track is None:
         raise HTTPException(404, "Track not found")
     artist_id = track.album.artist_id
-    entry = next(e for e in load_catalog(session, playlist, [artist_id])[artist_id] if e.track.id == track_id)
+    catalog = load_catalog(session, playlist, [artist_id], playlist_scope(session, playlist).linked)
+    entry = next((e for e in catalog[artist_id] if e.track.id == track_id), None)
+    if entry is None:
+        raise HTTPException(404, "Track not in this playlist")
     excluded_automatically = entry.status.automatic is not None
 
     state = session.get(PlaylistTrack, (playlist.id, track_id))

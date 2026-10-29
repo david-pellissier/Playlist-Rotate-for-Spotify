@@ -57,7 +57,7 @@ export default function PlaylistPage() {
 
   if (error) return <p className="error">{error}</p>;
   if (!playlist) return <p className="muted">Loading…</p>;
-  const artistsPerRotation = Math.min(playlist.max_artists ?? Infinity, playlist.artist_names.length);
+  const artistsPerRotation = Math.min(playlist.max_artists ?? Infinity, playlist.entries.length);
 
   return (
     <section className="stack">
@@ -97,7 +97,7 @@ export default function PlaylistPage() {
           icon="music"
           label="Songs per rotation"
           value={String(artistsPerRotation * playlist.songs_per_artist)}
-          hint={`${artistsPerRotation} of ${playlist.artist_names.length} artists × ${playlist.songs_per_artist}`}
+          hint={`${artistsPerRotation} of ${playlist.entries.length} artists × ${playlist.songs_per_artist}`}
         />
         <Stat icon="clock" label="Last rotation" value={formatDate(playlist.last_rotated_at)} />
       </div>

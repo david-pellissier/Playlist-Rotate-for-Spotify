@@ -105,7 +105,9 @@ def _album_exclusion(playlist: Playlist, matcher: RuleMatcher, album: Album) -> 
     return matcher.match(album.name)
 
 
-def load_catalog(session: Session, playlist: Playlist, artist_ids: list[str]) -> dict[str, list[Entry]]:
+def load_catalog(
+    session: Session, playlist: Playlist, artist_ids: list[str], linked: dict[str, set[str]]
+) -> dict[str, list[Entry]]:
     matcher = RuleMatcher(active_rules(session, playlist))
     states = {
         state.track_id: state
@@ -124,16 +126,25 @@ def load_catalog(session: Session, playlist: Playlist, artist_ids: list[str]) ->
     catalog: dict[str, list[Entry]] = {artist_id: [] for artist_id in artist_ids}
     album_statuses: dict[str, Status] = {}
     for track, album in rows:
+        allowed = linked.get(album.artist_id)
+        if allowed is not None and track.id not in allowed:
+            continue
+        unfiltered = allowed is not None
         if album.id not in album_statuses:
-            album_statuses[album.id] = _album_status(playlist, matcher, album, disabled_albums, enabled_albums)
+            album_statuses[album.id] = _album_status(
+                playlist, matcher, album, disabled_albums, enabled_albums, unfiltered
+            )
         album_status = album_statuses[album.id]
         state = states.get(track.id)
-        status = _track_status(playlist, matcher, track, album, state, album_status, track.id in enabled_tracks)
+        status = _track_status(
+            playlist, matcher, track, album, state, album_status, track.id in enabled_tracks, unfiltered
+        )
         catalog[album.artist_id].append(Entry(track, album, album_status, status, state, album.release_date))
 
     if playlist.exclude_duplicates:
-        for entries in catalog.values():
-            _mark_duplicates(entries, enabled_tracks)
+        for artist_id, entries in catalog.items():
+            if artist_id not in linked:
+                _mark_duplicates(entries, enabled_tracks)
     return catalog
 
 
@@ -142,9 +153,9 @@ def _playlist_ids(session: Session, column: InstrumentedAttribute[str], playlist
 
 
 def _album_status(
-    playlist: Playlist, matcher: RuleMatcher, album: Album, disabled: set[str], enabled: set[str]
+    playlist: Playlist, matcher: RuleMatcher, album: Album, disabled: set[str], enabled: set[str], unfiltered: bool
 ) -> Status:
-    status = Status(automatic=_album_exclusion(playlist, matcher, album))
+    status = Status(automatic=None if unfiltered else _album_exclusion(playlist, matcher, album))
     if album.id in disabled:
         status.exclude("album disabled", USER)
     status.apply_automatic(forced=album.id in enabled)
@@ -159,8 +170,9 @@ def _track_status(
     state: PlaylistTrack | None,
     album_status: Status,
     forced: bool,
+    unfiltered: bool,
 ) -> Status:
-    status = Status(automatic=_automatic_exclusion(playlist, matcher, track, album))
+    status = Status(automatic=None if unfiltered else _automatic_exclusion(playlist, matcher, track, album))
     if album_status.exclusion:
         status.exclude("album disabled" if album_status.excluded_by == USER else "album excluded", ALBUM)
     elif state and state.disabled:

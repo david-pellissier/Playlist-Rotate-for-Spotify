@@ -211,6 +211,12 @@ class Spotify:
         listed = await gather_all(fetch_group(group, released_after) for group, released_after in groups.items())
         return [album for group in listed for album in group]
 
+    async def album(self, album_id: str) -> dict:
+        return await self.request("GET", f"/albums/{album_id}")
+
+    async def track(self, track_id: str) -> dict:
+        return await self.request("GET", f"/tracks/{track_id}")
+
     async def album_tracks(self, album_id: str) -> list[dict]:
         tracks = []
         async for page in self.paginate(f"/albums/{album_id}/tracks", {"limit": 50}):
