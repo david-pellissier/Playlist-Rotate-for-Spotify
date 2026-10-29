@@ -1,12 +1,15 @@
+import logging
 import math
 import re
 from datetime import UTC, date, datetime, time, timedelta
 
-from sqlalchemy import JSON, ForeignKey, LargeBinary, String, Text
+from sqlalchemy import JSON, Connection, ForeignKey, LargeBinary, String, Text, inspect
 from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
 from .config import env
 from .db import Base, engine
+
+log = logging.getLogger(__name__)
 
 DEFAULT_KEYWORDS = (
     "live", "remix", "remixed", "mix", "instrumental", "acoustic",
@@ -246,8 +249,28 @@ class EnabledTrack(Base):
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+    with engine.begin() as connection:
+        _add_missing_columns(connection)
     with Session(engine) as session:
         if session.get(Settings, 1) is None:
             session.add(Settings(id=1))
             session.add_all(Rule(kind="keyword", pattern=keyword) for keyword in DEFAULT_KEYWORDS)
             session.commit()
+
+
+def _add_missing_columns(connection: Connection) -> None:
+    for table in Base.metadata.sorted_tables:
+        existing = {column["name"] for column in inspect(connection).get_columns(table.name)}
+        for column in table.columns:
+            if column.name in existing:
+                continue
+            ddl = f"ALTER TABLE {table.name} ADD COLUMN {column.name} {column.type.compile(connection.dialect)}"
+            if column.default is not None and column.default.is_scalar:
+                process = column.type.bind_processor(connection.dialect)
+                value = process(column.default.arg) if process else column.default.arg
+                default = str(value) if isinstance(value, int | float) else "'" + str(value).replace("'", "''") + "'"
+                ddl += f" NOT NULL DEFAULT {default}"
+            elif not column.nullable:
+                raise RuntimeError(f"Can't add {table.name}.{column.name} to the database: it has no default value")
+            connection.exec_driver_sql(ddl)
+            log.info("Added the %s.%s column to the database", table.name, column.name)

@@ -66,6 +66,8 @@ docker compose logs daemon
 - Set `WEB_BIND` to the address the manager should listen on, such as your VPN interface IP. The manager has
   no login, so never expose it publicly.
 - Your data is in `./data`. Stop the daemon before copying or opening the database.
+- When an update adds columns, the daemon adds them to your existing database at startup. Back up `./data`
+  before updating anyway.
 
 ## Configuration
 
