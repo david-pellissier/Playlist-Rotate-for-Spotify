@@ -24,10 +24,10 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
   albumsOnly: boolean;
   version: number;
 }) {
-  const defaultHiddenTypes = albumsOnly ? "single" : "";
+  const defaultReleases = albumsOnly ? "album" : "";
   const [hiddenArtists, setHiddenArtists] = useState<Set<string>>(new Set());
-  const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set());
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(defaultHiddenTypes ? [defaultHiddenTypes] : []));
+  const [statuses, setStatuses] = useState<Set<string>>(new Set());
+  const [releases, setReleases] = useState<Set<string>>(new Set(defaultReleases ? [defaultReleases] : []));
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const q = useDebounced(search);
@@ -40,9 +40,9 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
     () => api.catalog(playlistId, {
       q,
       page,
-      params: { ...artistParams, hide_status: [...hiddenStatuses], hide_type: [...hiddenTypes] },
+      params: { ...artistParams, status: [...statuses], release: [...releases] },
     }),
-    [playlistId, hiddenArtists, hiddenStatuses, hiddenTypes, q, page, version],
+    [playlistId, hiddenArtists, statuses, releases, q, page, version],
   );
   const action = useAction();
 
@@ -50,9 +50,9 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
     if (catalog) setArtistIds(catalog.artists.map((artist) => artist.id));
   }, [catalog]);
 
-  const filterKey = [...hiddenArtists, "|", ...hiddenStatuses, "|", ...hiddenTypes, "|", q.trim()].join(",");
-  const filtering = hiddenArtists.size > 0 || hiddenStatuses.size > 0 || q.trim() !== ""
-    || [...hiddenTypes].join() !== defaultHiddenTypes;
+  const filterKey = [...hiddenArtists, "|", ...statuses, "|", ...releases, "|", q.trim()].join(",");
+  const filtering = hiddenArtists.size > 0 || statuses.size > 0 || q.trim() !== ""
+    || [...releases].join() !== defaultReleases;
   const [allOpen, setAllOpen] = useState(false);
   const [toggledOpen, setToggledOpen] = useState<Map<string, boolean>>(new Map());
   const isOpen = (key: string) => toggledOpen.get(key) ?? allOpen;
@@ -118,15 +118,15 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
           label="Status"
           options={STATUSES}
           counts={catalog?.status_counts ?? {}}
-          hidden={hiddenStatuses}
-          onChange={(next) => filter(() => setHiddenStatuses(next))}
+          selected={statuses}
+          onChange={(next) => filter(() => setStatuses(next))}
         />
         <ChipFilter
           label="Release"
           options={RELEASE_TYPES}
           counts={catalog?.type_counts ?? {}}
-          hidden={hiddenTypes}
-          onChange={(next) => filter(() => setHiddenTypes(next))}
+          selected={releases}
+          onChange={(next) => filter(() => setReleases(next))}
         />
       </div>
 
@@ -180,20 +180,20 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
   );
 }
 
-function ChipFilter<T extends string>({ label, options, counts, hidden, onChange }: {
+function ChipFilter<T extends string>({ label, options, counts, selected, onChange }: {
   label: string;
   options: Record<T, string>;
   counts: Partial<Record<T, number>>;
-  hidden: Set<string>;
-  onChange: (hidden: Set<string>) => void;
+  selected: Set<string>;
+  onChange: (selected: Set<string>) => void;
 }) {
   return (
     <div className="chips" role="group" aria-label={label}>
       {(Object.entries(options) as [T, string][]).map(([value, name]) => {
-        const on = !hidden.has(value);
+        const on = selected.has(value);
         return (
-          <label key={value} className={on ? "chip on" : "chip"}>
-            <input type="checkbox" checked={on} onChange={() => onChange(toggled(hidden, value))} />
+          <label key={value} className={on ? "chip filter on" : "chip filter"}>
+            <input type="checkbox" checked={on} onChange={() => onChange(toggled(selected, value))} />
             {name}
             <span className="chip-count">{counts[value] ?? 0}</span>
           </label>

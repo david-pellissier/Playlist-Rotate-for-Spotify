@@ -1059,6 +1059,11 @@ label.chip:not(.on) {
   text-decoration: line-through;
 }
 
+label.chip.filter:not(.on) {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
 .rule-form {
   display: grid;
   grid-template-columns: 130px 1fr auto;

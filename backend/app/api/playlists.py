@@ -125,8 +125,8 @@ def create_playlist_rule(data: RuleIn, playlist: Playlist = Depends(get_playlist
 def read_catalog(
     artist: list[str] = Query([]),
     hide_artist: list[str] = Query([]),
-    hide_status: list[SongStatus] = Query([]),
-    hide_type: list[ReleaseType] = Query([]),
+    status: list[SongStatus] = Query([]),
+    release: list[ReleaseType] = Query([]),
     q: str = "",
     page: int = Query(1, ge=1),
     playlist: Playlist = Depends(get_playlist),
@@ -139,20 +139,20 @@ def read_catalog(
     cutoff = new_release_cutoff(playlist, utcnow())
     query = q.strip().casefold()
     included, hidden_artists = set(artist), set(hide_artist)
-    hidden_statuses, hidden_types = set(hide_status), set(hide_type)
+    statuses, releases = set(status), set(release)
 
     shown_artists = [a for a in names if (not included or a in included) and a not in hidden_artists]
     candidates = [
-        (entry, song_status(entry, cutoff), release_type(entry))
+        (entry, song_tags(entry, cutoff), release_type(entry))
         for current_artist in shown_artists
         for entry in catalog[current_artist]
         if matches_query(entry, query)
     ]
-    status_counts = Counter(status for _, status, kind in candidates if kind not in hidden_types)
-    type_counts = Counter(kind for _, status, kind in candidates if status not in hidden_statuses)
+    status_counts = Counter(tag for _, tags, kind in candidates if not releases or kind in releases for tag in tags)
+    type_counts = Counter(kind for _, tags, kind in candidates if not statuses or tags & statuses)
     selected: dict[str, list[Entry]] = {current_artist: [] for current_artist in shown_artists}
-    for entry, status, kind in candidates:
-        if status not in hidden_statuses and kind not in hidden_types:
+    for entry, tags, kind in candidates:
+        if (not statuses or tags & statuses) and (not releases or kind in releases):
             selected[entry.artist_id].append(entry)
     matching_artists = [current_artist for current_artist, entries in selected.items() if entries]
     page = min(page, max(1, math.ceil(len(matching_artists) / ARTISTS_PER_PAGE)))
@@ -293,14 +293,15 @@ async def rotate_playlist(
     )
 
 
-def song_status(entry: Entry, cutoff: date) -> str:
-    if entry.current:
-        return "current"
-    if not entry.eligible:
-        return "excluded"
-    if entry.cooldown:
-        return "cooldown"
-    return "new" if entry.is_new_release(cutoff) else "available"
+def song_tags(entry: Entry, cutoff: date) -> set[str]:
+    tags = {
+        "available": entry.available and not entry.current,
+        "new": entry.is_new_release(cutoff),
+        "cooldown": entry.cooldown > 0,
+        "current": entry.current,
+        "excluded": not entry.eligible,
+    }
+    return {tag for tag, matches in tags.items() if matches}
 
 
 def matches_query(entry: Entry, query: str) -> bool:
