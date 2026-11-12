@@ -222,6 +222,12 @@ class Spotify:
     async def track(self, track_id: str) -> dict:
         return await self.request("GET", f"/tracks/{track_id}")
 
+    async def playlist_items(self, playlist_id: str) -> list[dict]:
+        items = []
+        async for page in self.paginate(f"/playlists/{playlist_id}/items", {"limit": 50}):
+            items.extend(page)
+        return items
+
     async def album_tracks(self, album_id: str) -> list[dict]:
         tracks = []
         async for page in self.paginate(f"/albums/{album_id}/tracks", {"limit": 50}):

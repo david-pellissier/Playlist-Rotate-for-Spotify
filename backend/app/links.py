@@ -4,10 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .catalog import Scope, song_artist_id
-from .models import SPOTIFY_LINK, Album, Artist, Playlist, Track, utcnow
+from .models import SPOTIFY_LINK, Album, Artist, Playlist, SourcePlaylist, Track, utcnow
 from .progress import Progress
 from .spotify import NotFoundError, RateLimitError, SpotifyError, pick_image, spotify
-from .sync import failed_lookups, load_image, new_album, new_track, recently_failed, store_album, stored_artist
+from .sync import (
+    RESYNC_AFTER, failed_lookups, load_image, new_album, new_track, recently_failed, store_album, stored_artist,
+)
 
 log = logging.getLogger(__name__)
 
@@ -25,10 +27,14 @@ def playlist_scope(session: Session, playlist: Playlist) -> Scope:
             .options(selectinload(Album.tracks))
         )
     }
-    tracks = {
-        track.id: track
-        for track in session.scalars(select(Track).where(Track.id.in_([i for _, kind, i in links if kind == "track"])))
+    sources = {
+        source.id: source
+        for source in session.scalars(
+            select(SourcePlaylist).where(SourcePlaylist.id.in_([i for _, kind, i in links if kind == "playlist"]))
+        )
     }
+    track_ids = [i for _, kind, i in links if kind == "track"] + [t for s in sources.values() for t in s.track_ids]
+    tracks = {track.id: track for track in session.scalars(select(Track).where(Track.id.in_(track_ids)))}
 
     scope = Scope([])
     artists: dict[str, Artist] = {}
@@ -44,13 +50,18 @@ def playlist_scope(session: Session, playlist: Playlist) -> Scope:
             artists.setdefault(artist.id, artist)
             named.add(artist.id)
             continue
-        found = albums.get(item_id) if kind == "album" else tracks.get(item_id)
-        if found is None:
+        if kind == "playlist":
+            source = sources.get(item_id)
+            songs = [tracks[t] for t in source.track_ids if t in tracks] if source else None
+        elif kind == "album":
+            songs = albums[item_id].tracks if item_id in albums else None
+        else:
+            songs = [tracks[item_id]] if item_id in tracks else None
+        if songs is None:
             scope.missing.append(entry)
             continue
-        album = found if kind == "album" else found.album
-        for track in album.tracks if kind == "album" else [found]:
-            owner = song_artist_id(track, album)
+        for track in songs:
+            owner = song_artist_id(track, track.album)
             if owner in by_id:
                 artists.setdefault(owner, by_id[owner])
                 scope.linked.setdefault(owner, set()).add(track.id)
@@ -62,8 +73,13 @@ def playlist_scope(session: Session, playlist: Playlist) -> Scope:
 
 async def sync_links(session: Session, playlist: Playlist, progress: Progress) -> None:
     links = [(kind, item_id) for _, kind, item_id in playlist.links]
-    ids = {kind: [i for k, i in links if k == kind] for kind in ("artist", "album", "track")}
+    ids = {kind: [i for k, i in links if k == kind] for kind in ("artist", "album", "track", "playlist")}
     known = {
+        "playlist": set(session.scalars(
+            select(SourcePlaylist.id).where(
+                SourcePlaylist.id.in_(ids["playlist"]), SourcePlaylist.synced_at > utcnow() - RESYNC_AFTER
+            )
+        )),
         "artist": set(session.scalars(select(Artist.id).where(Artist.id.in_(ids["artist"])))),
         "album": set(session.scalars(select(Album.id).where(Album.id.in_(ids["album"]), Album.complete))),
         "track": set(session.scalars(select(Track.id).where(Track.id.in_(ids["track"])))),
@@ -72,8 +88,8 @@ async def sync_links(session: Session, playlist: Playlist, progress: Progress) -
     if not wanted:
         return
 
-    progress.start("Loading linked artists, albums and songs", len(wanted))
-    loaders = {"artist": _load_artist, "album": _load_album, "track": _load_track}
+    progress.start("Loading linked artists, albums, songs and playlists", len(wanted))
+    loaders = {"artist": _load_artist, "album": _load_album, "track": _load_track, "playlist": _load_playlist}
     artists: set[Artist] = set()
     for kind, item_id in wanted:
         try:
@@ -113,11 +129,28 @@ async def _load_album(session: Session, album_id: str) -> list[Artist]:
 async def _load_track(session: Session, track_id: str) -> list[Artist]:
     if session.get(Track, track_id):
         return []
-    data = await spotify.track(track_id)
+    return _store_track(session, await spotify.track(track_id))
+
+
+async def _load_playlist(session: Session, playlist_id: str) -> list[Artist]:
+    items = [item.get("item") or {} for item in await spotify.playlist_items(playlist_id)]
+    tracks = [data for data in items if data.get("type") == "track" and data.get("id") and not data.get("is_local")]
+    artists = [artist for data in tracks for artist in _store_track(session, data)]
+    source = session.get(SourcePlaylist, playlist_id)
+    if source is None:
+        source = SourcePlaylist(id=playlist_id)
+        session.add(source)
+    source.track_ids = list(dict.fromkeys(data["id"] for data in tracks))
+    source.synced_at = utcnow()
+    return artists
+
+
+def _store_track(session: Session, data: dict) -> list[Artist]:
     artist = stored_artist(session, data["album"]["artists"][0])
-    album = session.get(Album, data["album"]["id"])
-    if album is None:
-        album = new_album(artist, data["album"], complete=False)
-        session.add(album)
-    album.tracks.append(new_track(data))
+    if session.get(Track, data["id"]) is None:
+        album = session.get(Album, data["album"]["id"])
+        if album is None:
+            album = new_album(artist, data["album"], complete=False)
+            session.add(album)
+        album.tracks.append(new_track(data))
     return [stored_artist(session, data["artists"][0])] if data["album"]["album_type"] == "compilation" else [artist]

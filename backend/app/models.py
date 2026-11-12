@@ -15,7 +15,7 @@ DEFAULT_KEYWORDS = (
     "live", "remix", "remixed", "mix", "instrumental", "acoustic",
     "remaster", "remastered", "demo", "piano", "intro", "outro",
 )
-SPOTIFY_LINK = re.compile(r"(?:open\.spotify\.com/(?:intl-[\w-]+/)?|spotify:)(artist|album|track)[/:]([A-Za-z0-9]{22})")
+SPOTIFY_LINK = re.compile(r"(?:open\.spotify\.com/(?:intl-[\w-]+/)?|spotify:)(artist|album|track|playlist)[/:]([A-Za-z0-9]{22})")
 
 
 def utcnow() -> datetime:
@@ -171,6 +171,14 @@ class PlaylistCover(Base):
     content_type: Mapped[str]
     updated_at: Mapped[datetime]
     checked_at: Mapped[datetime]
+
+
+class SourcePlaylist(Base):
+    __tablename__ = "source_playlists"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    track_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    synced_at: Mapped[datetime]
 
 
 class Rule(Base):
