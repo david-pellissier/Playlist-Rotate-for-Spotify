@@ -82,7 +82,7 @@ export interface CatalogTrack {
 
 export interface CatalogAlbum {
   id: string;
-  artist_name: string;
+  artist_id: string;
   name: string;
   album_type: string;
   release_date: string;

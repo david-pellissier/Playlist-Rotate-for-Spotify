@@ -1,8 +1,11 @@
 import { type CSSProperties, useEffect, useState } from "react";
 import { api } from "../api";
-import { formatDuration, nameHue } from "../format";
+import { nameHue } from "../format";
+import AlbumCard from "./AlbumCard";
+import ChipFilter from "./ChipFilter";
 import InfoTip from "./InfoTip";
-import MultiSelect, { toggled } from "./MultiSelect";
+import MultiSelect from "./MultiSelect";
+import Toggle from "./Toggle";
 import { useAction, useDebounced, useLoader } from "../hooks";
 import type { Catalog, CatalogAlbum, CatalogTrack, ReleaseType, SongStatus } from "../types";
 
@@ -140,17 +143,18 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
       {catalog && catalog.total_tracks > 0 && <Pager catalog={catalog} onPage={goTo} />}
       {catalog?.total_tracks === 0 && <div className="empty-state">No songs match these filters.</div>}
 
-      {groupByArtist(catalog?.albums ?? []).map(([artistName, albums]) => {
-        const artist = catalog?.artists.find((a) => a.name === artistName);
+      {groupByArtist(catalog?.albums ?? []).map(([artistId, albums]) => {
+        const artist = catalog?.artists.find((a) => a.id === artistId);
+        const artistName = artist?.name ?? "";
         const songs = albums.reduce((count, album) => count + album.tracks.length, 0);
-        const open = isOpen(`artist:${artistName}`);
+        const open = isOpen(`artist:${artistId}`);
         return (
-          <section key={artistName} className={open ? "artist-section" : "artist-section collapsed"}>
+          <section key={artistId} className={open ? "artist-section" : "artist-section collapsed"}>
             <header
               className="artist-header"
               style={artist?.image_url ? ({ "--artist-image": `url("${artist.image_url}")` } as CSSProperties) : undefined}
             >
-              <Toggle open={open} label={artistName} onClick={() => toggle(`artist:${artistName}`)} />
+              <Toggle open={open} label={artistName} onClick={() => toggle(`artist:${artistId}`)} />
               <ArtistAvatar name={artistName} image={artist?.image_url ?? null} />
               <div className="artist-title">
                 <h2>{artistName}</h2>
@@ -162,11 +166,11 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
             </header>
             {open && albums.map((album) => (
               <AlbumCard
-                key={`${artistName}:${album.id}`}
+                key={album.id}
                 album={album}
-                open={isOpen(`album:${album.id}`)}
+                open={isOpen(`album:${artistId}:${album.id}`)}
                 busy={action.busy}
-                onToggleOpen={() => toggle(`album:${album.id}`)}
+                onToggleOpen={() => toggle(`album:${artistId}:${album.id}`)}
                 onToggleAlbum={() => toggleAlbum(album)}
                 onToggleTrack={toggleTrack}
               />
@@ -180,32 +184,9 @@ export default function CatalogView({ playlistId, albumsOnly, version }: {
   );
 }
 
-function ChipFilter<T extends string>({ label, options, counts, selected, onChange }: {
-  label: string;
-  options: Record<T, string>;
-  counts: Partial<Record<T, number>>;
-  selected: Set<string>;
-  onChange: (selected: Set<string>) => void;
-}) {
-  return (
-    <div className="chips" role="group" aria-label={label}>
-      {(Object.entries(options) as [T, string][]).map(([value, name]) => {
-        const on = selected.has(value);
-        return (
-          <label key={value} className={on ? "chip filter on" : "chip filter"}>
-            <input type="checkbox" checked={on} onChange={() => onChange(toggled(selected, value))} />
-            {name}
-            <span className="chip-count">{counts[value] ?? 0}</span>
-          </label>
-        );
-      })}
-    </div>
-  );
-}
-
 function groupByArtist(albums: CatalogAlbum[]): [string, CatalogAlbum[]][] {
   const groups = new Map<string, CatalogAlbum[]>();
-  for (const album of albums) groups.set(album.artist_name, [...(groups.get(album.artist_name) ?? []), album]);
+  for (const album of albums) groups.set(album.artist_id, [...(groups.get(album.artist_id) ?? []), album]);
   return [...groups];
 }
 
@@ -216,77 +197,6 @@ function ArtistAvatar({ name, image }: { name: string; image: string | null }) {
     <span className="artist-avatar initials" style={{ "--avatar-hue": nameHue(name) } as CSSProperties} aria-hidden="true">
       {initials}
     </span>
-  );
-}
-
-function Toggle({ open, label, onClick }: { open: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      className={open ? "toggle open" : "toggle"}
-      aria-expanded={open}
-      aria-label={`${open ? "Collapse" : "Expand"} ${label}`}
-      title={open ? "Collapse" : "Expand"}
-      onClick={onClick}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-        <path d="m9 6 6 6-6 6" />
-      </svg>
-    </button>
-  );
-}
-
-function AlbumCard({ album, open, busy, onToggleOpen, onToggleAlbum, onToggleTrack }: {
-  album: CatalogAlbum;
-  open: boolean;
-  busy: boolean;
-  onToggleOpen: () => void;
-  onToggleAlbum: () => void;
-  onToggleTrack: (track: CatalogTrack) => void;
-}) {
-  const eligible = album.tracks.filter((track) => !track.exclusion).length;
-  return (
-    <article className={album.exclusion ? "album disabled" : "album"}>
-      <header className={open ? "album-header" : "album-header collapsed"}>
-        <Toggle open={open} label={album.name} onClick={onToggleOpen} />
-        {album.image_url
-          ? <img className="album-cover" src={album.image_url} alt="" loading="lazy" />
-          : <span className="album-cover" />}
-        <div className="album-info">
-          <h3 title={album.name}>{album.name}</h3>
-          <small>
-            {album.album_type} · {album.release_date} · {album.tracks.length} {album.tracks.length === 1 ? "song" : "songs"},{" "}
-            {eligible} eligible
-          </small>
-        </div>
-        <AlbumStatus album={album} />
-        <button className="small" disabled={busy} onClick={onToggleAlbum}>
-          {album.exclusion ? "Enable album" : "Disable album"}
-        </button>
-      </header>
-      {open && (
-        <div className="table-scroll">
-          <table>
-            <tbody>
-              {album.tracks.map((track) => (
-                <tr key={track.id} className={track.exclusion ? "excluded" : undefined}>
-                  <td className="track-name">{track.name}</td>
-                  <td className="numeric muted">{formatDuration(track.duration)}</td>
-                  <td className="numeric muted" title="Times played">{track.play_count}×</td>
-                  <td><TrackStatus track={track} /></td>
-                  <td className="cell-actions">
-                    {track.excluded_by !== "album" && (
-                      <button className="small ghost" disabled={busy} onClick={() => onToggleTrack(track)}>
-                        {track.exclusion ? "Enable" : "Disable"}
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </article>
   );
 }
 
@@ -310,25 +220,5 @@ function Pager({ catalog, onPage }: { catalog: Catalog; onPage: (page: number) =
         </div>
       )}
     </div>
-  );
-}
-
-function AlbumStatus({ album }: { album: CatalogAlbum }) {
-  if (album.excluded_by === "auto") return <span className="badge warning">Excluded: {album.exclusion}</span>;
-  if (album.excluded_by === "user") return <span className="badge warning">Album disabled</span>;
-  if (album.forced) return <span className="badge info">Enabled manually</span>;
-  return null;
-}
-
-function TrackStatus({ track }: { track: CatalogTrack }) {
-  if (track.exclusion) return <span className="badge">{track.exclusion}</span>;
-  return (
-    <span className="badges">
-      {track.forced && <span className="badge info">Enabled manually</span>}
-      {track.new_release && <span className="badge info">New release</span>}
-      {track.current && <span className="badge accent">In playlist</span>}
-      {track.cooldown > 0 && <span className="badge warning">Cooldown {track.cooldown}</span>}
-      {!track.current && track.cooldown === 0 && <span className="badge success">Available</span>}
-    </span>
   );
 }

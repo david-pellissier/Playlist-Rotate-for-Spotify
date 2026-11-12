@@ -15,26 +15,10 @@ log = logging.getLogger(__name__)
 
 
 def playlist_scope(session: Session, playlist: Playlist) -> Scope:
-    links = playlist.links
     all_artists = session.scalars(select(Artist)).all()
-    by_name = {artist.name.casefold(): artist for artist in all_artists}
+    by_name = {artist.name.casefold(): artist for artist in all_artists if artist.listed}
     by_id = {artist.id: artist for artist in all_artists}
-    albums = {
-        album.id: album
-        for album in session.scalars(
-            select(Album)
-            .where(Album.id.in_([i for _, kind, i in links if kind == "album"]), Album.complete)
-            .options(selectinload(Album.tracks))
-        )
-    }
-    sources = {
-        source.id: source
-        for source in session.scalars(
-            select(SourcePlaylist).where(SourcePlaylist.id.in_([i for _, kind, i in links if kind == "playlist"]))
-        )
-    }
-    track_ids = [i for _, kind, i in links if kind == "track"] + [t for s in sources.values() for t in s.track_ids]
-    tracks = {track.id: track for track in session.scalars(select(Track).where(Track.id.in_(track_ids)))}
+    songs = _linked_songs(session, playlist)
 
     scope = Scope([])
     artists: dict[str, Artist] = {}
@@ -49,26 +33,33 @@ def playlist_scope(session: Session, playlist: Playlist) -> Scope:
                 continue
             artists.setdefault(artist.id, artist)
             named.add(artist.id)
-            continue
-        if kind == "playlist":
-            source = sources.get(item_id)
-            songs = [tracks[t] for t in source.track_ids if t in tracks] if source else None
-        elif kind == "album":
-            songs = albums[item_id].tracks if item_id in albums else None
+        elif item_id in songs:
+            for track in songs[item_id]:
+                owner = song_artist_id(track, track.album)
+                if owner in by_id:
+                    artists.setdefault(owner, by_id[owner])
+                    scope.linked.setdefault(owner, set()).add(track.id)
+                    scope.linked_tracks.add(track.id)
         else:
-            songs = [tracks[item_id]] if item_id in tracks else None
-        if songs is None:
             scope.missing.append(entry)
-            continue
-        for track in songs:
-            owner = song_artist_id(track, track.album)
-            if owner in by_id:
-                artists.setdefault(owner, by_id[owner])
-                scope.linked.setdefault(owner, set()).add(track.id)
-                scope.linked_tracks.add(track.id)
     scope.artists = list(artists.values())
     scope.linked = {artist_id: ids for artist_id, ids in scope.linked.items() if artist_id not in named}
     return scope
+
+
+def _linked_songs(session: Session, playlist: Playlist) -> dict[str, list[Track]]:
+    ids = {kind: [i for _, k, i in playlist.links if k == kind] for kind in ("album", "track", "playlist")}
+    albums = session.scalars(
+        select(Album).where(Album.id.in_(ids["album"]), Album.complete).options(selectinload(Album.tracks))
+    ).all()
+    sources = session.scalars(select(SourcePlaylist).where(SourcePlaylist.id.in_(ids["playlist"]))).all()
+    track_ids = ids["track"] + [track_id for source in sources for track_id in source.track_ids]
+    tracks = {track.id: track for track in session.scalars(select(Track).where(Track.id.in_(track_ids)))}
+
+    songs = {album.id: album.tracks for album in albums}
+    songs |= {track_id: [tracks[track_id]] for track_id in ids["track"] if track_id in tracks}
+    songs |= {source.id: [tracks[t] for t in source.track_ids if t in tracks] for source in sources}
+    return songs
 
 
 async def sync_links(session: Session, playlist: Playlist, progress: Progress) -> None:
@@ -113,6 +104,7 @@ async def _load_artist(session: Session, artist_id: str) -> list[Artist]:
     data = await spotify.artist(artist_id)
     artist = stored_artist(session, data)
     artist.image_url = pick_image(data.get("images"))
+    artist.listed = True
     return [artist]
 
 

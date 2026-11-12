@@ -166,7 +166,7 @@ def read_catalog(
         key = (entry.artist_id, entry.album.id)
         album = albums.get(key) or albums.setdefault(key, AlbumOut(
             id=entry.album.id,
-            artist_name=names[entry.artist_id],
+            artist_id=entry.artist_id,
             name=entry.album.name,
             album_type=entry.album.album_type,
             release_date=entry.album.release_date,
@@ -276,6 +276,7 @@ async def rotate_playlist(
     session: Session = Depends(get_session),
 ):
     plan = await rotate(session, playlist, dry_run)
+    names = {selection.artist.id: selection.artist.name for selection in plan.selections}
     return RotationOut(
         dry_run=dry_run,
         selections=[
@@ -283,13 +284,13 @@ async def rotate_playlist(
                 artist_name=selection.artist.name,
                 eligible=selection.eligible,
                 cooldown=selection.cooldown,
-                picks=[pick_out(pick) for pick in selection.picks],
+                picks=[pick_out(pick, selection.artist.name) for pick in selection.picks],
             )
             for selection in plan.selections
         ],
         missing_artists=plan.missing_artists,
         skipped_artists=[artist.name for artist in plan.skipped_artists],
-        order=[pick_out(pick) for pick in plan.order],
+        order=[pick_out(pick, names[pick.entry.artist_id]) for pick in plan.order],
     )
 
 
@@ -324,13 +325,13 @@ def track_out(entry: Entry, cutoff: date) -> TrackOut:
     )
 
 
-def pick_out(pick: Pick) -> PickOut:
+def pick_out(pick: Pick, artist_name: str) -> PickOut:
     track, album = pick.entry.track, pick.entry.album
     return PickOut(
         track_id=track.id,
         name=track.name,
         album_name=album.name,
-        artist_name=album.artist.name,
+        artist_name=artist_name,
         duration=track.duration_ms // 1000,
         source=pick.source,
     )

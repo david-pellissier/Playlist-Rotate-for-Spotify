@@ -154,7 +154,7 @@ def load_catalog(
         album_status = album_statuses[album.id, unfiltered]
         state = states.get(track.id)
         status = _track_status(
-            playlist, matcher, track, album, state, album_status, track.id in enabled_tracks, unfiltered
+            playlist, matcher, track, artist_id, state, album_status, track.id in enabled_tracks, unfiltered
         )
         catalog[artist_id].append(Entry(track, album, artist_id, album_status, status, state, album.release_date))
 
@@ -183,13 +183,13 @@ def _track_status(
     playlist: Playlist,
     matcher: RuleMatcher,
     track: Track,
-    album: Album,
+    artist_id: str,
     state: PlaylistTrack | None,
     album_status: Status,
     forced: bool,
     unfiltered: bool,
 ) -> Status:
-    status = Status(automatic=None if unfiltered else _automatic_exclusion(playlist, matcher, track, album))
+    status = Status(automatic=None if unfiltered else _automatic_exclusion(playlist, matcher, track, artist_id))
     if album_status.exclusion:
         status.exclude("album disabled" if album_status.excluded_by == USER else "album excluded", ALBUM)
     elif state and state.disabled:
@@ -198,9 +198,9 @@ def _track_status(
     return status
 
 
-def _automatic_exclusion(playlist: Playlist, matcher: RuleMatcher, track: Track, album: Album) -> str | None:
+def _automatic_exclusion(playlist: Playlist, matcher: RuleMatcher, track: Track, artist_id: str) -> str | None:
     seconds = track.duration_ms // 1000
-    if not track.artist_ids or track.artist_ids[0] != album.artist_id:
+    if not track.artist_ids or track.artist_ids[0] != artist_id:
         return "guest appearance"
     if playlist.solo_only and len(track.artist_ids) > 1:
         return "featuring"

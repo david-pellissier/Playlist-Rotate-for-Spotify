@@ -117,7 +117,7 @@ class TrackOut(BaseModel):
 
 class AlbumOut(BaseModel):
     id: str
-    artist_name: str
+    artist_id: str
     name: str
     album_type: str
     release_date: date

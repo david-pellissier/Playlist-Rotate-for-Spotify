@@ -24,7 +24,7 @@ def recently_failed(key: str) -> bool:
 
 
 async def resolve_artists(session: Session, names: list[str], progress: Progress) -> None:
-    known = {name.casefold() for name in session.scalars(select(Artist.name))}
+    known = {name.casefold() for name in session.scalars(select(Artist.name).where(Artist.listed))}
     unknown = [name for name in names if name.casefold() not in known and not recently_failed(name.casefold())]
     progress.start("Finding artists", len(unknown))
     found = await gather_all(progress.count(spotify.find_artist(name)) for name in unknown)
@@ -36,6 +36,7 @@ async def resolve_artists(session: Session, names: list[str], progress: Progress
         elif artist := session.get(Artist, data["id"]):
             artist.name = data["name"]
             artist.image_url = pick_image(data.get("images"))
+            artist.listed = True
         else:
             session.add(Artist(id=data["id"], name=data["name"], image_url=pick_image(data.get("images"))))
     session.commit()
@@ -45,7 +46,8 @@ def artists_needing_singles(session: Session) -> set[str]:
     playlists = session.scalars(select(Playlist).where(Playlist.albums_only.is_(False))).all()
     names = {name.casefold() for playlist in playlists for name in playlist.artist_names}
     linked = {item_id for playlist in playlists for _, kind, item_id in playlist.links if kind == "artist"}
-    return linked | {artist.id for artist in session.scalars(select(Artist)) if artist.name.casefold() in names}
+    listed = session.scalars(select(Artist).where(Artist.listed))
+    return linked | {artist.id for artist in listed if artist.name.casefold() in names}
 
 
 async def sync_artists(session: Session, artists: list[Artist], progress: Progress) -> None:
@@ -109,7 +111,7 @@ async def _sync_artist(session: Session, artist: Artist, lookback: timedelta, wi
 def stored_artist(session: Session, data: dict) -> Artist:
     artist = session.get(Artist, data["id"])
     if artist is None:
-        artist = Artist(id=data["id"], name=data["name"])
+        artist = Artist(id=data["id"], name=data["name"], listed=False)
         session.add(artist)
     return artist
 

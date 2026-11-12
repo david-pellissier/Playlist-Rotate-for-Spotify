@@ -181,7 +181,7 @@ class Spotify:
                     await asyncio.sleep(2 ** attempt)
                     continue
                 if response.is_error:
-                    error = NotFoundError if response.status_code in (400, 404) else SpotifyError
+                    error = NotFoundError if response.status_code in (400, 403, 404) else SpotifyError
                     raise error(f"{method} {url} failed ({response.status_code}): {response.text}")
                 return response.json() if response.content else None
         raise SpotifyError(f"{method} {url} failed after {MAX_ATTEMPTS} attempts ({problem})")

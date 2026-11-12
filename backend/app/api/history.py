@@ -5,7 +5,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_session
-from ..models import Album, Playlist, Rotation, RotationTrack, Track
+from ..catalog import song_artist_id
+from ..models import Album, Artist, Playlist, Rotation, RotationTrack, Track
 from ..schemas import HistoryOut, RotationSummary, RotationTrackOut
 from .playlists import get_playlist
 
@@ -71,12 +72,14 @@ def read_rotation(
     )
     if rotation is None:
         raise HTTPException(404, "Rotation not found")
+    owners = {item.track_id: song_artist_id(item.track, item.track.album) for item in rotation.tracks}
+    names = dict(session.execute(select(Artist.id, Artist.name).where(Artist.id.in_(owners.values()))).all())
     return [
         RotationTrackOut(
             position=item.position,
             track_id=item.track_id,
             name=item.track.name,
-            artist_name=item.track.album.artist.name,
+            artist_name=names.get(owners[item.track_id], item.track.album.artist.name),
             album_name=item.track.album.name,
             duration=item.track.duration_ms // 1000,
             source=item.source,

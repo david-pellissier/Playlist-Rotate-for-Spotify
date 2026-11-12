@@ -34,6 +34,7 @@ class Artist(Base):
     synced_at: Mapped[datetime | None]
     singles_synced: Mapped[bool] = mapped_column(default=True)
     image_url: Mapped[str | None]
+    listed: Mapped[bool] = mapped_column(default=True)
 
     albums: Mapped[list["Album"]] = relationship(back_populates="artist", cascade="all, delete-orphan")
 
@@ -138,7 +139,11 @@ class Playlist(Base):
 
     @property
     def links(self) -> list[tuple[str, str, str]]:
-        return [(entry, *match.groups()) for entry in self.entries if (match := SPOTIFY_LINK.search(entry))]
+        links = [(entry, *match.groups()) for entry in self.entries if (match := SPOTIFY_LINK.search(entry))]
+        return [link for link in links if not self._is_target(*link[1:])]
+
+    def _is_target(self, kind: str, item_id: str) -> bool:
+        return kind == "playlist" and (item_id == self.spotify_playlist_id or item_id in self.spotify_target)
 
     @property
     def next_rotation_at(self) -> datetime:
