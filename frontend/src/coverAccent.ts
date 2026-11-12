@@ -1,4 +1,4 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useState } from "react";
 
 interface CoverAccent {
   hue: number;
@@ -91,12 +91,27 @@ export function useCoverAccent(url: string | null): CSSProperties | undefined {
     };
   }, [url]);
 
-  if (!accent) return undefined;
-  const percent = (value: number) => `${Math.round(value * 100)}%`;
-  return {
-    "--cover-h": accent.hue,
-    "--cover-s": percent(accent.saturation),
-    "--cover-light-l": percent(readableLightness(accent, LIGHT_SURFACE, 0.4, -0.01)),
-    "--cover-dark-l": percent(readableLightness(accent, DARK_SURFACE, 0.62, 0.01)),
-  } as CSSProperties;
+  return useMemo(() => {
+    if (!accent) return undefined;
+    const percent = (value: number) => `${Math.round(value * 100)}%`;
+    return {
+      "--cover-h": accent.hue,
+      "--cover-s": percent(accent.saturation),
+      "--cover-light-l": percent(readableLightness(accent, LIGHT_SURFACE, 0.4, -0.01)),
+      "--cover-dark-l": percent(readableLightness(accent, DARK_SURFACE, 0.62, 0.01)),
+    } as CSSProperties;
+  }, [accent]);
+}
+
+export function usePageTheme(theme: CSSProperties | undefined) {
+  useEffect(() => {
+    if (!theme) return;
+    const root = document.documentElement;
+    root.classList.add("themed");
+    for (const [name, value] of Object.entries(theme)) root.style.setProperty(name, String(value));
+    return () => {
+      root.classList.remove("themed");
+      for (const name of Object.keys(theme)) root.style.removeProperty(name);
+    };
+  }, [theme]);
 }

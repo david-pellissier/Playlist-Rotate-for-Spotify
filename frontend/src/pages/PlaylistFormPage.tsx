@@ -74,6 +74,15 @@ export default function PlaylistFormPage() {
     if (saved) navigate(`/playlists/${saved.id}`);
   }
 
+  async function remove() {
+    if (!confirm(`Delete the configuration "${form!.name}"? The Spotify playlist itself is kept.`)) return;
+    const removed = await save.run(async () => {
+      await api.deletePlaylist(id!);
+      return true;
+    });
+    if (removed) navigate("/");
+  }
+
   return (
     <form className="stack" onSubmit={submit}>
       <div className="page-header">
@@ -198,6 +207,7 @@ export default function PlaylistFormPage() {
       </Panel>
 
       <div className="form-footer">
+        {id && <button type="button" className="ghost danger" disabled={save.busy} onClick={remove}>Delete playlist</button>}
         {save.error && <span className="error">{save.error}</span>}
         <Link className="button" to={backTo}>Cancel</Link>
         <button className="primary" disabled={save.busy}>{id ? "Save changes" : "Create playlist"}</button>

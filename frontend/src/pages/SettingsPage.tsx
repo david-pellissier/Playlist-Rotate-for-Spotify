@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { api } from "../api";
 import { Checkbox, NumberField } from "../components/Fields";
 import Panel from "../components/Panel";
@@ -32,6 +33,7 @@ export default function SettingsPage() {
     <section className="stack">
       <div className="page-header">
         <div className="page-title">
+          <Link to="/" className="back-link">← Playlists</Link>
           <h1>Settings</h1>
         </div>
       </div>

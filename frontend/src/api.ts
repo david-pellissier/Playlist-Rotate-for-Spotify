@@ -47,6 +47,7 @@ export const api = {
   playlist: (id: number) => request<Playlist>(`/playlists/${id}`),
   createPlaylist: (data: PlaylistInput) => request<Playlist>("/playlists", "POST", data),
   updatePlaylist: (id: number, data: PlaylistInput) => request<Playlist>(`/playlists/${id}`, "PUT", data),
+  setEnabled: (id: number, enabled: boolean) => request<void>(`/playlists/${id}/enabled`, "PUT", { enabled }),
   deletePlaylist: (id: number) => request<void>(`/playlists/${id}`, "DELETE"),
   exportUrl: (id: number) => `/api/playlists/${id}/export`,
   importPlaylist: (data: unknown, onConflict: ImportConflict = "fail") =>

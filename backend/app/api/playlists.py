@@ -96,6 +96,12 @@ def update_playlist(data: PlaylistIn, playlist: Playlist = Depends(get_playlist)
     return playlist_out(session, playlist)
 
 
+@router.put("/{playlist_id}/enabled", status_code=204)
+def set_enabled(data: EnabledIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
+    playlist.enabled = data.enabled
+    session.commit()
+
+
 @router.get("/{playlist_id}/cover")
 def read_cover(playlist: Playlist = Depends(get_playlist)):
     if not playlist.cover_url:

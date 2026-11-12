@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { nameHue } from "../format";
 
-export default function PlaylistCover({ name, url, size }: { name: string; url: string | null; size?: "large" | "fill" }) {
-  const className = size ? `playlist-cover ${size}` : "playlist-cover";
+export default function PlaylistCover({ name, url, size }: { name: string; url: string | null; size: "large" | "fill" }) {
+  const className = `playlist-cover ${size}`;
   if (url) return <img className={className} src={url} alt="" loading="lazy" />;
   return (
     <span className={`${className} placeholder`} style={{ "--cover-hue": nameHue(name) } as CSSProperties} aria-hidden="true">
