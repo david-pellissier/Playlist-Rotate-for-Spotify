@@ -12,7 +12,7 @@ It runs as two containers:
 ## Personal note and disclaimer
 
 > [!CAUTION] 
->'Spotify Playlist Rotate' was made for my own use case where I don't need extra security. This small project was built using Claude and reviewed by me. I don't plan releasing updates or maintaining it, unless for critical issues.  
+> This tool was made for my own use case where I don't need extra security. This small project was built using Claude and reviewed by me. I don't plan releasing updates or maintaining it, unless for critical issues.  
 >&nbsp;  
 >When using it, make sure to never expose the web interface to Internet. Also don't leak your `.env` file, of course.   
 >&nbsp;  
