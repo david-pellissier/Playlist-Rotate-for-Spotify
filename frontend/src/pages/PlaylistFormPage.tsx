@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api";
+import { useCoverAccent, usePageTheme } from "../coverAccent";
 import { Checkbox, NumberField } from "../components/Fields";
 import InfoTip from "../components/InfoTip";
 import Panel from "../components/Panel";
@@ -41,6 +42,7 @@ export default function PlaylistFormPage() {
     () => Promise.all([api.settings(), api.rules(), id ? api.playlist(id) : Promise.resolve(undefined)]),
     [id],
   );
+  usePageTheme(useCoverAccent(data?.[2]?.cover_url ?? null));
   const [form, setForm] = useState<PlaylistInput>();
   const [playlistRules, setPlaylistRules] = useState<Rule[]>([]);
   const save = useAction();
