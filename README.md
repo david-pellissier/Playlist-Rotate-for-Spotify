@@ -59,6 +59,21 @@ Errors are written to the daemon's logs:
 docker compose logs daemon
 ```
 
+## Artist list
+
+One entry per line:
+
+| Entry | Adds to the pool |
+|---|---|
+| Artist name or link | The artist's whole catalog |
+| Album link | The album's songs |
+| Song link | The song |
+| Playlist link | The playlist's songs |
+| Playlist link ending in `#artists` | The whole catalog of each song's main artist |
+| Line starting with `#` | Nothing |
+
+Whole catalogs are filtered and checked for new releases; songs from links are not. Linked playlists must be your own.
+
 ## Running on a server
 
 - Spotify only accepts `http` redirect URIs on `127.0.0.1`, so authorize on your own computer and copy the
