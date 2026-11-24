@@ -5,7 +5,7 @@ from itertools import batched
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Album, Artist, Playlist, Settings, Track, utcnow
+from .models import Album, Artist, Playlist, Settings, SourcePlaylist, Track, utcnow
 from .progress import Progress
 from .spotify import RateLimitError, SpotifyError, gather_all, parse_release_date, pick_image, spotify
 
@@ -45,9 +45,21 @@ async def resolve_artists(session: Session, names: list[str], progress: Progress
 def artists_needing_singles(session: Session) -> set[str]:
     playlists = session.scalars(select(Playlist).where(Playlist.albums_only.is_(False))).all()
     names = {name.casefold() for playlist in playlists for name in playlist.artist_names}
-    linked = {item_id for playlist in playlists for _, kind, item_id in playlist.links if kind == "artist"}
+    links = [(kind, item_id) for playlist in playlists for _, kind, item_id in playlist.links]
+    linked = {item_id for kind, item_id in links if kind == "artist"}
+    sources = [item_id for kind, item_id in links if kind == "playlist_artists"]
+    for artist_ids in playlist_main_artists(session, sources).values():
+        linked.update(artist_ids)
     listed = session.scalars(select(Artist).where(Artist.listed))
     return linked | {artist.id for artist in listed if artist.name.casefold() in names}
+
+
+def playlist_main_artists(session: Session, playlist_ids: list[str]) -> dict[str, list[str]]:
+    sources = session.scalars(select(SourcePlaylist).where(SourcePlaylist.id.in_(playlist_ids))).all()
+    track_ids = [track_id for source in sources for track_id in source.track_ids]
+    rows = session.execute(select(Track.id, Track.artist_ids).where(Track.id.in_(track_ids)))
+    first = {track_id: artist_ids[0] for track_id, artist_ids in rows if artist_ids}
+    return {source.id: list(dict.fromkeys(first[t] for t in source.track_ids if t in first)) for source in sources}
 
 
 async def sync_artists(session: Session, artists: list[Artist], progress: Progress) -> None:

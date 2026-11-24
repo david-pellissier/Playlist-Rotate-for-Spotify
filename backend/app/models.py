@@ -16,6 +16,11 @@ DEFAULT_KEYWORDS = (
     "remaster", "remastered", "demo", "piano", "intro", "outro",
 )
 SPOTIFY_LINK = re.compile(r"(?:open\.spotify\.com/(?:intl-[\w-]+/)?|spotify:)(artist|album|track|playlist)[/:]([A-Za-z0-9]{22})")
+ARTISTS_SUFFIX = "#artists"
+
+
+def link_kind(entry: str, kind: str) -> str:
+    return "playlist_artists" if kind == "playlist" and entry.casefold().endswith(ARTISTS_SUFFIX) else kind
 
 
 def utcnow() -> datetime:
@@ -139,11 +144,13 @@ class Playlist(Base):
 
     @property
     def links(self) -> list[tuple[str, str, str]]:
-        links = [(entry, *match.groups()) for entry in self.entries if (match := SPOTIFY_LINK.search(entry))]
+        matches = [(entry, match) for entry in self.entries if (match := SPOTIFY_LINK.search(entry))]
+        links = [(entry, link_kind(entry, match[1]), match[2]) for entry, match in matches]
         return [link for link in links if not self._is_target(*link[1:])]
 
     def _is_target(self, kind: str, item_id: str) -> bool:
-        return kind == "playlist" and (item_id == self.spotify_playlist_id or item_id in self.spotify_target)
+        is_target = item_id == self.spotify_playlist_id or item_id in self.spotify_target
+        return kind in ("playlist", "playlist_artists") and is_target
 
     @property
     def next_rotation_at(self) -> datetime:

@@ -4,11 +4,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .catalog import Scope, song_artist_id
-from .models import SPOTIFY_LINK, Album, Artist, Playlist, SourcePlaylist, Track, utcnow
+from .models import SPOTIFY_LINK, Album, Artist, Playlist, SourcePlaylist, Track, link_kind, utcnow
 from .progress import Progress
 from .spotify import NotFoundError, RateLimitError, SpotifyError, pick_image, spotify
 from .sync import (
-    RESYNC_AFTER, failed_lookups, load_image, new_album, new_track, recently_failed, store_album, stored_artist,
+    failed_lookups, load_image, new_album, new_track, playlist_main_artists, recently_failed, store_album, stored_artist,
 )
 
 log = logging.getLogger(__name__)
@@ -19,14 +19,23 @@ def playlist_scope(session: Session, playlist: Playlist) -> Scope:
     by_name = {artist.name.casefold(): artist for artist in all_artists if artist.listed}
     by_id = {artist.id: artist for artist in all_artists}
     songs = _linked_songs(session, playlist)
+    main_artists = playlist_main_artists(session, [i for _, kind, i in playlist.links if kind == "playlist_artists"])
 
     scope = Scope([])
     artists: dict[str, Artist] = {}
     named: set[str] = set()
     for entry in playlist.entries:
         match = SPOTIFY_LINK.search(entry)
-        kind, item_id = match.groups() if match else ("name", entry)
-        if kind in ("name", "artist"):
+        kind, item_id = (link_kind(entry, match[1]), match[2]) if match else ("name", entry)
+        if kind == "playlist_artists":
+            if item_id not in main_artists:
+                scope.missing.append(entry)
+                continue
+            for artist_id in main_artists[item_id]:
+                if artist_id in by_id:
+                    artists.setdefault(artist_id, by_id[artist_id])
+                    named.add(artist_id)
+        elif kind in ("name", "artist"):
             artist = by_name.get(entry.casefold()) if kind == "name" else by_id.get(item_id)
             if artist is None:
                 scope.missing.append(entry)
@@ -64,23 +73,25 @@ def _linked_songs(session: Session, playlist: Playlist) -> dict[str, list[Track]
 
 async def sync_links(session: Session, playlist: Playlist, progress: Progress) -> None:
     links = [(kind, item_id) for _, kind, item_id in playlist.links]
-    ids = {kind: [i for k, i in links if k == kind] for kind in ("artist", "album", "track", "playlist")}
+    ids = {kind: [i for k, i in links if k == kind] for kind in ("artist", "album", "track")}
     known = {
-        "playlist": set(session.scalars(
-            select(SourcePlaylist.id).where(
-                SourcePlaylist.id.in_(ids["playlist"]), SourcePlaylist.synced_at > utcnow() - RESYNC_AFTER
-            )
-        )),
         "artist": set(session.scalars(select(Artist.id).where(Artist.id.in_(ids["artist"])))),
         "album": set(session.scalars(select(Album.id).where(Album.id.in_(ids["album"]), Album.complete))),
         "track": set(session.scalars(select(Track.id).where(Track.id.in_(ids["track"])))),
     }
-    wanted = list(dict.fromkeys((kind, i) for kind, i in links if i not in known[kind] and not recently_failed(i)))
+    stale = [(kind, i) for kind, i in links if i not in known.get(kind, ()) and not recently_failed(i)]
+    wanted = list(dict.fromkeys(stale))
     if not wanted:
         return
 
     progress.start("Loading linked artists, albums, songs and playlists", len(wanted))
-    loaders = {"artist": _load_artist, "album": _load_album, "track": _load_track, "playlist": _load_playlist}
+    loaders = {
+        "artist": _load_artist,
+        "album": _load_album,
+        "track": _load_track,
+        "playlist": _load_playlist,
+        "playlist_artists": _load_playlist_artists,
+    }
     artists: set[Artist] = set()
     for kind, item_id in wanted:
         try:
@@ -92,12 +103,20 @@ async def sync_links(session: Session, playlist: Playlist, progress: Progress) -
             session.rollback()
             if isinstance(error, NotFoundError):
                 failed_lookups[item_id] = utcnow()
-            log.warning("Could not load the Spotify %s %s: %s", kind, item_id, error)
+                _forget_playlist(session, kind, item_id)
+            log.warning("Could not load the Spotify %s %s: %s", kind.replace("_", " "), item_id, error)
         progress.done += 1
     for artist in artists:
         if artist.image_url is None:
             await load_image(artist)
             session.commit()
+
+
+def _forget_playlist(session: Session, kind: str, playlist_id: str) -> None:
+    source = session.get(SourcePlaylist, playlist_id) if kind in ("playlist", "playlist_artists") else None
+    if source is not None:
+        session.delete(source)
+        session.commit()
 
 
 async def _load_artist(session: Session, artist_id: str) -> list[Artist]:
@@ -125,16 +144,29 @@ async def _load_track(session: Session, track_id: str) -> list[Artist]:
 
 
 async def _load_playlist(session: Session, playlist_id: str) -> list[Artist]:
+    return [artist for data in await _read_playlist(session, playlist_id) for artist in _store_track(session, data)]
+
+
+async def _load_playlist_artists(session: Session, playlist_id: str) -> list[Artist]:
+    artists: dict[str, Artist] = {}
+    for data in await _read_playlist(session, playlist_id):
+        _store_track(session, data)
+        if data["artists"] and data["artists"][0].get("id"):
+            artist = stored_artist(session, data["artists"][0])
+            artists[artist.id] = artist
+    return list(artists.values())
+
+
+async def _read_playlist(session: Session, playlist_id: str) -> list[dict]:
     items = [item.get("item") or {} for item in await spotify.playlist_items(playlist_id)]
     tracks = [data for data in items if data.get("type") == "track" and data.get("id") and not data.get("is_local")]
-    artists = [artist for data in tracks for artist in _store_track(session, data)]
     source = session.get(SourcePlaylist, playlist_id)
     if source is None:
         source = SourcePlaylist(id=playlist_id)
         session.add(source)
     source.track_ids = list(dict.fromkeys(data["id"] for data in tracks))
     source.synced_at = utcnow()
-    return artists
+    return tracks
 
 
 def _store_track(session: Session, data: dict) -> list[Artist]:

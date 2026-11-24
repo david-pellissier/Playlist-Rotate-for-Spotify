@@ -109,7 +109,7 @@ export default function PlaylistFormPage() {
         <label>
           <span>
             Artists
-            <InfoTip text="One per line: an exact Spotify artist name, or a Spotify artist, album, song or playlist link. Songs from album, song and playlist links are never filtered, and their artist isn't checked for new releases. A linked playlist must be one of yours; it's read again at each refresh. Lines starting with # are ignored." />
+            <InfoTip text="One per line: an exact Spotify artist name, or a Spotify artist, album, song or playlist link. Songs from album, song and playlist links are never filtered, and their artist isn't checked for new releases. Add #artists at the end of a playlist link to use the main artist of each of its songs instead, like artist links. A linked playlist must be one of yours; it's read again at each refresh. Lines starting with # are ignored." />
           </span>
           <textarea rows={12} value={form.artists} onChange={(e) => set("artists", e.target.value)} />
         </label>
