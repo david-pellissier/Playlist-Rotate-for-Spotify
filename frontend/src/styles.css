@@ -24,6 +24,8 @@
   --button-bg: var(--surface);
   --button-hover: var(--surface-muted);
   color-scheme: light;
+  scrollbar-color: var(--accent) transparent;
+  scrollbar-width: thin;
   font-family: "Geist Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 14.5px;
   line-height: 1.5;
