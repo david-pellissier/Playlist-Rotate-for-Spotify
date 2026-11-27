@@ -209,6 +209,10 @@ main {
   text-decoration: none;
 }
 
+.page-title .back-link {
+  margin-bottom: 10px;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
@@ -390,6 +394,10 @@ label.checkbox {
 
 .field-grid > label.checkbox {
   align-self: end;
+}
+
+.field-grid.three-columns {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 label.checkbox.disabled {
@@ -746,7 +754,7 @@ span.success:not(.badge) {
   display: flex;
   align-items: flex-end;
   gap: 32px;
-  margin: 8px 0 12px;
+  margin-bottom: 12px;
 }
 
 .hero-cover {
@@ -1687,7 +1695,8 @@ tbody tr.history-detail:hover td {
   }
 
   .toolbar,
-  .rule-form {
+  .rule-form,
+  .field-grid.three-columns {
     grid-template-columns: 1fr;
   }
 

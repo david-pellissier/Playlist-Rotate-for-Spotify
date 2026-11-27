@@ -120,66 +120,72 @@ export default function PlaylistFormPage() {
 
       <ScheduleFields form={form} isNew={!id} onChange={set} />
 
-      <Panel title="Rotation" grid>
-        <NumberField
-          label="Artists per rotation"
-          info="Leave empty to include every artist."
-          min={1}
-          value={form.max_artists}
-          onChange={(v) => set("max_artists", v)}
-          optional
-          placeholder="All artists"
-        />
-        <label>
-          <span>
-            Artist choice
-            <InfoTip text="Used when artists per rotation is limited. Fair picks the artists left out the longest first." />
-          </span>
-          <select
-            value={form.artist_selection}
+      <Panel title="Rotation">
+        <div className="field-grid three-columns">
+          <NumberField
+            label="Artists per rotation"
+            info="Leave empty to include every artist."
+            min={1}
+            value={form.max_artists}
+            onChange={(v) => set("max_artists", v)}
+            optional
+            placeholder="All artists"
+          />
+          <label>
+            <span>
+              Artist choice
+              <InfoTip text="Used when artists per rotation is limited. Fair picks the artists left out the longest first." />
+            </span>
+            <select
+              value={form.artist_selection}
+              disabled={form.max_artists === null}
+              onChange={(e) => set("artist_selection", e.target.value as ArtistSelection)}
+            >
+              <option value="fair">Fair</option>
+              <option value="random">Random</option>
+            </select>
+          </label>
+          <Checkbox
+            label="New releases first"
+            info="Used when artists per rotation is limited. Artists with a new release are picked before the others."
+            checked={form.new_releases_first}
             disabled={form.max_artists === null}
-            onChange={(e) => set("artist_selection", e.target.value as ArtistSelection)}
-          >
-            <option value="fair">Fair</option>
-            <option value="random">Random</option>
-          </select>
-        </label>
-        <Checkbox
-          label="New releases first"
-          info="Used when artists per rotation is limited. Artists with a new release are picked before the others."
-          checked={form.new_releases_first}
-          disabled={form.max_artists === null}
-          onChange={(v) => set("new_releases_first", v)}
-        />
-        <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
-        <NumberField
-          label="Max new releases per artist"
-          info="Songs released since the last rotation are picked first, up to this number."
-          min={0}
-          value={form.max_new_releases}
-          onChange={(v) => set("max_new_releases", v as number)}
-        />
-        <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
+            onChange={(v) => set("new_releases_first", v)}
+          />
+          <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
+          <NumberField
+            label="Max new releases per artist"
+            info="Songs released since the last rotation are picked first, up to this number."
+            min={0}
+            value={form.max_new_releases}
+            onChange={(v) => set("max_new_releases", v as number)}
+          />
+          <Checkbox label="Shuffle track order" checked={form.shuffle} onChange={(v) => set("shuffle", v)} />
+        </div>
       </Panel>
 
-      <Panel title="Filters" grid>
-        <NumberField label="Min duration (seconds)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
-        <NumberField
-          label="Max duration (seconds)"
-          min={1}
-          value={form.max_duration}
-          onChange={(v) => set("max_duration", v)}
-          optional
-          placeholder="No limit"
-        />
-        <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
-        <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
-        <Checkbox
-          label="Albums only"
-          info="Singles and EPs are excluded. They are only downloaded if another playlist with the same artist uses them."
-          checked={form.albums_only}
-          onChange={(v) => set("albums_only", v)}
-        />
+      <Panel title="Filters">
+        <div className="field-grid three-columns">
+          <NumberField label="Min duration (seconds)" min={0} value={form.min_duration} onChange={(v) => set("min_duration", v as number)} />
+          <NumberField
+            label="Max duration (seconds)"
+            min={1}
+            value={form.max_duration}
+            onChange={(v) => set("max_duration", v)}
+            optional
+            placeholder="No limit"
+          />
+        </div>
+        <div className="field-grid three-columns">
+          <Checkbox label="Exclude songs with featured artists" checked={form.solo_only} onChange={(v) => set("solo_only", v)} />
+          <Checkbox label="Exclude duplicates" checked={form.exclude_duplicates} onChange={(v) => set("exclude_duplicates", v)} />
+          <Checkbox
+            label="Albums only"
+            info="Singles and EPs are excluded. They are only downloaded if another playlist with the same artist uses them."
+            checked={form.albums_only}
+            onChange={(v) => set("albums_only", v)}
+          />
+        </div>
       </Panel>
 
       <Panel title="Global rules" info="Click a rule to turn it off for this playlist. The list itself is managed in Settings.">
@@ -217,7 +223,7 @@ export default function PlaylistFormPage() {
       </Panel>
 
       <div className="form-footer">
-        {id && <button type="button" className="ghost danger" disabled={save.busy} onClick={remove}>Delete playlist</button>}
+        {id && <button type="button" className="ghost danger" disabled={save.busy} onClick={remove}>Delete</button>}
         {save.error && <span className="error">{save.error}</span>}
         <Link className="button" to={backTo}>Cancel</Link>
         <button className="primary" disabled={save.busy}>{id ? "Save changes" : "Create playlist"}</button>
