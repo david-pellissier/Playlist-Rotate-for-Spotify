@@ -48,6 +48,7 @@ class PlaylistSettings(Schema):
     songs_per_artist: int = Field(ge=1)
     max_artists: int | None = Field(default=None, ge=1)
     artist_selection: Literal["fair", "random"] = "fair"
+    new_releases_first: bool = False
     max_new_releases: int = Field(ge=0)
     update_interval_days: int = Field(ge=1)
     first_rotation_date: date

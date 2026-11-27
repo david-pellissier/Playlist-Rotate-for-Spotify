@@ -19,6 +19,7 @@ function defaults(settings: Settings): PlaylistInput {
     songs_per_artist: 3,
     max_artists: null,
     artist_selection: "fair",
+    new_releases_first: false,
     max_new_releases: 1,
     update_interval_days: 7,
     first_rotation_date: todayIso(),
@@ -143,6 +144,13 @@ export default function PlaylistFormPage() {
             <option value="random">Random</option>
           </select>
         </label>
+        <Checkbox
+          label="New releases first"
+          info="Used when artists per rotation is limited. Artists with a new release are picked before the others."
+          checked={form.new_releases_first}
+          disabled={form.max_artists === null}
+          onChange={(v) => set("new_releases_first", v)}
+        />
         <NumberField label="Songs per artist" min={1} value={form.songs_per_artist} onChange={(v) => set("songs_per_artist", v as number)} />
         <NumberField
           label="Max new releases per artist"

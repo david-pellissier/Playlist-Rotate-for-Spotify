@@ -101,6 +101,7 @@ class Playlist(Base):
     songs_per_artist: Mapped[int] = mapped_column(default=3)
     max_artists: Mapped[int | None]
     artist_selection: Mapped[str] = mapped_column(default="fair")
+    new_releases_first: Mapped[bool] = mapped_column(default=False)
     max_new_releases: Mapped[int] = mapped_column(default=1)
     update_interval_days: Mapped[int] = mapped_column(default=7)
     first_rotation_date: Mapped[date]

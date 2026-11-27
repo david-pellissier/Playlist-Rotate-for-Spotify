@@ -81,8 +81,16 @@ def select_tracks(entries: list[Entry], count: int, max_new: int, cutoff: date) 
     return picks
 
 
+def has_new_release(entries: list[Entry], cutoff: date) -> bool:
+    return any(e.available and e.is_new_release(cutoff) for e in entries)
+
+
 def choose_artists(
-    playlist: Playlist, artists: list[Artist], catalog: dict[str, list[Entry]], last_picked: dict[str, datetime]
+    playlist: Playlist,
+    artists: list[Artist],
+    catalog: dict[str, list[Entry]],
+    last_picked: dict[str, datetime],
+    cutoff: date,
 ) -> list[Artist]:
     if not playlist.max_artists or len(artists) <= playlist.max_artists:
         return artists
@@ -90,6 +98,8 @@ def choose_artists(
     random.shuffle(candidates)
     if playlist.artist_selection == "fair":
         candidates.sort(key=lambda artist: last_picked.get(artist.id, datetime.min))
+    if playlist.new_releases_first:
+        candidates.sort(key=lambda artist: not has_new_release(catalog[artist.id], cutoff))
     chosen = set(candidates[:playlist.max_artists])
     return [artist for artist in artists if artist in chosen]
 
@@ -103,7 +113,7 @@ def plan_rotation(session: Session, playlist: Playlist, scope: Scope, now: datet
         picked.artist_id: picked.last_picked_at
         for picked in session.scalars(select(PlaylistArtist).where(PlaylistArtist.playlist_id == playlist.id))
     }
-    chosen = choose_artists(playlist, artists, catalog, last_picked)
+    chosen = choose_artists(playlist, artists, catalog, last_picked, cutoff)
 
     selections = []
     for artist in chosen:

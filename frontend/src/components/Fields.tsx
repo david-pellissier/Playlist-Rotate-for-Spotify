@@ -28,11 +28,17 @@ export function Checkbox(props: {
   label: string;
   info?: string;
   checked: boolean;
+  disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="checkbox">
-      <input type="checkbox" checked={props.checked} onChange={(e) => props.onChange(e.target.checked)} />
+    <label className={props.disabled ? "checkbox disabled" : "checkbox"}>
+      <input
+        type="checkbox"
+        checked={props.checked}
+        disabled={props.disabled}
+        onChange={(e) => props.onChange(e.target.checked)}
+      />
       <span>{props.label}{props.info && <InfoTip text={props.info} />}</span>
     </label>
   );

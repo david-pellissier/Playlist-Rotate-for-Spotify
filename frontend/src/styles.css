@@ -392,6 +392,15 @@ label.checkbox {
   align-self: end;
 }
 
+label.checkbox.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+label.checkbox.disabled input {
+  cursor: not-allowed;
+}
+
 code {
   padding: 1px 6px;
   border-radius: var(--radius-xs);

@@ -25,6 +25,7 @@ export interface PlaylistInput {
   songs_per_artist: number;
   max_artists: number | null;
   artist_selection: ArtistSelection;
+  new_releases_first: boolean;
   max_new_releases: number;
   update_interval_days: number;
   first_rotation_date: string;
