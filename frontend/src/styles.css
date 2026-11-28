@@ -1475,6 +1475,11 @@ ul.plain li.pick .row {
   gap: 6px;
 }
 
+tr.current td,
+tbody tr.current:hover td {
+  background: var(--accent-soft);
+}
+
 tr.history-detail td,
 tbody tr.history-detail:hover td {
   padding-top: 0;

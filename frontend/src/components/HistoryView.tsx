@@ -105,7 +105,7 @@ function HistoryRow({ playlistId, rotation, open, busy, onToggle, onRewind }: {
   const trigger = TRIGGERS[rotation.trigger];
   return (
     <>
-      <tr>
+      <tr className={rotation.current ? "current" : undefined}>
         <td className="nowrap">
           {formatDate(rotation.rotated_at)}
           <small className="show-sm">
@@ -117,7 +117,12 @@ function HistoryRow({ playlistId, rotation, open, busy, onToggle, onRewind }: {
         <td>
           {rotation.error
             ? <span className="badge danger" title={rotation.error}>Failed</span>
-            : <span className="badge success">Updated</span>}
+            : (
+              <span className="badges">
+                <span className="badge success">Updated</span>
+                {rotation.current && <span className="badge accent">Current</span>}
+              </span>
+            )}
         </td>
         <td className="numeric hide-sm">{rotation.error ? "—" : rotation.track_count}</td>
         <td className="numeric hide-sm">{rotation.error ? "—" : rotation.new_releases}</td>
@@ -137,7 +142,14 @@ function HistoryRow({ playlistId, rotation, open, busy, onToggle, onRewind }: {
           <td colSpan={6}>
             <RotationTracks playlistId={playlistId} rotationId={rotation.id} />
             <div className="history-actions">
-              <button className="small" disabled={busy} onClick={onRewind}>Rewind to these songs</button>
+              <button
+                className="small"
+                disabled={busy || rotation.current}
+                title={rotation.current ? "These songs are already in the playlist" : undefined}
+                onClick={onRewind}
+              >
+                Rewind to these songs
+              </button>
             </div>
           </td>
         </tr>

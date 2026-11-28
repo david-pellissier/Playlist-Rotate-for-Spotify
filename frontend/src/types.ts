@@ -158,6 +158,7 @@ export interface RotationSummary {
   error: string | null;
   track_count: number;
   new_releases: number;
+  current: boolean;
 }
 
 export interface History {

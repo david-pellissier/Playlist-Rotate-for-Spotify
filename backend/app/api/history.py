@@ -24,6 +24,12 @@ def read_history(
 ):
     total = session.scalar(select(func.count()).select_from(Rotation).where(Rotation.playlist_id == playlist.id))
     page = min(page, max(1, math.ceil(total / HISTORY_PAGE_SIZE)))
+    current_id = session.scalar(
+        select(Rotation.id)
+        .where(Rotation.playlist_id == playlist.id, Rotation.error.is_(None))
+        .order_by(Rotation.rotated_at.desc())
+        .limit(1)
+    )
     rows = session.execute(
         select(
             Rotation,
@@ -46,6 +52,7 @@ def read_history(
                 error=rotation.error,
                 track_count=track_count,
                 new_releases=new_releases,
+                current=rotation.id == current_id,
             )
             for rotation, track_count, new_releases in rows
         ],

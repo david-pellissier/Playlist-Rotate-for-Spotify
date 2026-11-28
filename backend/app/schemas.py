@@ -206,6 +206,7 @@ class RotationSummary(BaseModel):
     error: str | None
     track_count: int
     new_releases: int
+    current: bool
 
 
 class HistoryOut(BaseModel):
