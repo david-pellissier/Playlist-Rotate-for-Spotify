@@ -117,24 +117,40 @@ def plan_rotation(session: Session, playlist: Playlist, scope: Scope, now: datet
 
     selections = []
     for artist in chosen:
-        entries = catalog[artist.id]
-        eligible = sum(e.eligible for e in entries)
-        picks = select_tracks(entries, playlist.songs_per_artist, playlist.max_new_releases, cutoff)
+        picks = select_tracks(catalog[artist.id], playlist.songs_per_artist, playlist.max_new_releases, cutoff)
         if len(picks) < playlist.songs_per_artist:
             log.warning("%s: only %d eligible tracks for %s", playlist.name, len(picks), artist.name)
-        selections.append(ArtistSelection(
-            artist,
-            eligible,
-            artist_cooldown(eligible, playlist.songs_per_artist, min_cooldown),
-            picks,
-            [entry.track.id for entry in entries],
-        ))
+        selections.append(artist_selection(playlist, artist, catalog[artist.id], picks, min_cooldown))
 
     order = [pick for selection in selections for pick in selection.picks]
     if playlist.shuffle:
         random.shuffle(order)
     skipped = [artist for artist in artists if artist not in chosen]
     return RotationPlan(selections, scope.missing, skipped, order)
+
+
+def replay_plan(session: Session, playlist: Playlist, scope: Scope, planned: list[list[str]]) -> RotationPlan:
+    min_cooldown = session.get(Settings, 1).min_cooldown
+    catalog = load_catalog(session, playlist, scope)
+    entries = {entry.track.id: entry for artist_entries in catalog.values() for entry in artist_entries}
+    order = [Pick(entries[track_id], source) for track_id, source in planned if track_id in entries]
+    picks: dict[str, list[Pick]] = {}
+    for pick in order:
+        picks.setdefault(pick.entry.artist_id, []).append(pick)
+    selections = [
+        artist_selection(playlist, artist, catalog[artist.id], picks[artist.id], min_cooldown)
+        for artist in scope.artists if artist.id in picks
+    ]
+    skipped = [artist for artist in scope.artists if artist.id not in picks]
+    return RotationPlan(selections, scope.missing, skipped, order)
+
+
+def artist_selection(
+    playlist: Playlist, artist: Artist, entries: list[Entry], picks: list[Pick], min_cooldown: int
+) -> ArtistSelection:
+    eligible = sum(e.eligible for e in entries)
+    cooldown = artist_cooldown(eligible, playlist.songs_per_artist, min_cooldown)
+    return ArtistSelection(artist, eligible, cooldown, picks, [entry.track.id for entry in entries])
 
 
 def apply_rotation(session: Session, playlist: Playlist, plan: RotationPlan, now: datetime, trigger: str) -> None:
@@ -187,10 +203,12 @@ async def refresh_catalog(session: Session, playlist: Playlist) -> None:
             await _refresh_catalog(session, playlist, progress)
 
 
-async def rotate(session: Session, playlist: Playlist, dry_run: bool, trigger: str = "manual") -> RotationPlan:
+async def rotate(
+    session: Session, playlist: Playlist, dry_run: bool, trigger: str = "manual", planned: list[list[str]] | None = None
+) -> RotationPlan:
     with track(playlist.id) as progress:
         async with rotation_lock:
-            return await _rotate(session, playlist, dry_run, trigger, progress)
+            return await _rotate(session, playlist, dry_run, trigger, progress, planned)
 
 
 async def rewind(session: Session, playlist: Playlist, rotation: Rotation) -> None:
@@ -230,13 +248,22 @@ def mark_current(session: Session, playlist: Playlist, track_ids: list[str]) -> 
 
 
 async def _rotate(
-    session: Session, playlist: Playlist, dry_run: bool, trigger: str, progress: Progress
+    session: Session,
+    playlist: Playlist,
+    dry_run: bool,
+    trigger: str,
+    progress: Progress,
+    planned: list[list[str]] | None,
 ) -> RotationPlan:
     try:
-        scope = await _refresh_catalog(session, playlist, progress)
+        scope = playlist_scope(session, playlist) if planned else await _refresh_catalog(session, playlist, progress)
         progress.start("Selecting tracks")
         now = utcnow()
-        plan = plan_rotation(session, playlist, scope, now)
+        planned = planned or (None if dry_run else playlist.planned_tracks)
+        if planned:
+            plan = replay_plan(session, playlist, scope, planned)
+        else:
+            plan = plan_rotation(session, playlist, scope, now)
         if dry_run:
             return plan
         if not plan.order:
@@ -246,6 +273,7 @@ async def _rotate(
             playlist.spotify_playlist_id = await spotify.resolve_playlist(playlist.spotify_target)
         await spotify.replace_playlist_items(playlist.spotify_playlist_id, [p.entry.track.uri for p in plan.order])
         apply_rotation(session, playlist, plan, now, trigger)
+        playlist.planned_tracks = None
         session.commit()
         log.info("Rotated %s with %d tracks", playlist.name, len(plan.order))
         return plan

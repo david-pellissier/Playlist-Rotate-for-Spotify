@@ -69,6 +69,7 @@ class PlaylistIn(PlaylistSettings):
 class PlaylistOut(PlaylistIn):
     id: int
     artist_count: int = 0
+    planned_count: int = 0
     spotify_playlist_id: str | None
     last_rotated_at: UtcDatetime | None
     next_rotation_at: UtcDatetime
@@ -161,6 +162,15 @@ class PickOut(BaseModel):
     artist_name: str
     duration: int
     source: str
+
+
+class PlannedTrack(BaseModel):
+    track_id: str
+    source: Literal["new", "random", "cooldown"]
+
+
+class PlanIn(BaseModel):
+    tracks: list[PlannedTrack] = Field(min_length=1)
 
 
 class SelectionOut(BaseModel):

@@ -40,6 +40,24 @@ export default function PlaylistPage() {
     setCatalogVersion((v) => v + 1);
   }
 
+  async function useNow() {
+    if (!confirm("Replace the Spotify playlist content with this preview now?")) return;
+    const result = await action.run(() => api.rotatePlanned(id, rotation!.order));
+    if (result) setRotation(result);
+    reload();
+    setCatalogVersion((v) => v + 1);
+  }
+
+  async function planNext() {
+    await action.run(() => api.savePlan(id, rotation!.order));
+    reload();
+  }
+
+  async function cancelPlan() {
+    await action.run(() => api.cancelPlan(id));
+    reload();
+  }
+
   async function refresh() {
     await action.run(() => api.sync(id));
     setCatalogVersion((v) => v + 1);
@@ -102,6 +120,14 @@ export default function PlaylistPage() {
       {progress ? <JobProgress progress={progress} /> : action.busy && <p className="muted">Working…</p>}
       {action.error && <p className="error">{action.error}</p>}
       {playlist.last_error && <p className="error"><strong>Last rotation failed:</strong> {playlist.last_error}</p>}
+      {playlist.planned_count > 0 && (
+        <div className="notice banner">
+          <span>
+            <strong>Next rotation planned.</strong> It will use the {playlist.planned_count} songs picked from a dry run.
+          </span>
+          <button className="small" disabled={working} onClick={cancelPlan}>Cancel plan</button>
+        </div>
+      )}
 
       <div className="tabs" role="tablist">
         <TabButton active={tab === "songs"} onClick={() => setTab("songs")}>Songs</TabButton>
@@ -114,7 +140,7 @@ export default function PlaylistPage() {
         <HistoryView playlistId={id} version={catalogVersion} onRewound={() => setCatalogVersion((v) => v + 1)} />
       )}
       {tab === "rotation" && (rotation
-        ? <RotationView rotation={rotation} />
+        ? <RotationView rotation={rotation} busy={working} onUseNow={useNow} onPlan={planNext} />
         : (
           <div className="empty-state">
             <h2>No preview yet</h2>

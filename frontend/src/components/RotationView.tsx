@@ -7,14 +7,25 @@ const SOURCE_BADGES = {
   cooldown: <span className="badge warning">From cooldown</span>,
 };
 
-export default function RotationView({ rotation }: { rotation: Rotation }) {
+export default function RotationView({ rotation, busy, onUseNow, onPlan }: {
+  rotation: Rotation;
+  busy: boolean;
+  onUseNow: () => void;
+  onPlan: () => void;
+}) {
   return (
     <div className="stack">
-      <p className={rotation.dry_run ? "notice" : "success"}>
-        {rotation.dry_run
-          ? <><strong>Dry run</strong> · {rotation.order.length} songs, nothing changed</>
-          : <><strong>Playlist updated</strong> · {rotation.order.length} songs</>}
-      </p>
+      {rotation.dry_run
+        ? (
+          <div className="notice banner">
+            <span><strong>Dry run</strong> · {rotation.order.length} songs, nothing changed</span>
+            <div className="actions">
+              <button className="small" disabled={busy || !rotation.order.length} onClick={onPlan}>Use for next rotation</button>
+              <button className="small primary" disabled={busy || !rotation.order.length} onClick={onUseNow}>Use now</button>
+            </div>
+          </div>
+        )
+        : <p className="success"><strong>Playlist updated</strong> · {rotation.order.length} songs</p>}
       {rotation.skipped_artists.length > 0 && (
         <p className="muted">
           <strong>Sitting out:</strong> {rotation.skipped_artists.join(", ")}

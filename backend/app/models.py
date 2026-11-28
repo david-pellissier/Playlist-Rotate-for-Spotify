@@ -102,6 +102,7 @@ class Playlist(Base):
     max_artists: Mapped[int | None]
     artist_selection: Mapped[str] = mapped_column(default="fair")
     new_releases_first: Mapped[bool] = mapped_column(default=False)
+    planned_tracks: Mapped[list[list[str]] | None] = mapped_column(JSON)
     max_new_releases: Mapped[int] = mapped_column(default=1)
     update_interval_days: Mapped[int] = mapped_column(default=7)
     first_rotation_date: Mapped[date]
@@ -127,6 +128,10 @@ class Playlist(Base):
             self.spotify_playlist_id = None
             self.cover = None
         self.spotify_target = target
+
+    @property
+    def planned_count(self) -> int:
+        return len(self.planned_tracks or [])
 
     @property
     def cover_url(self) -> str | None:

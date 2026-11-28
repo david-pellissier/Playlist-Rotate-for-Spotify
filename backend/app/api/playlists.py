@@ -12,10 +12,10 @@ from ..catalog import Entry, album_automatic_exclusion, load_catalog, song_artis
 from ..db import get_session
 from ..models import Album, DisabledAlbum, EnabledAlbum, EnabledTrack, Playlist, PlaylistTrack, Rule, Track, utcnow
 from ..progress import running_jobs
-from ..rotation import Pick, new_release_cutoff, refresh_catalog, rotate
+from ..rotation import Pick, RotationPlan, new_release_cutoff, refresh_catalog, rotate
 from ..schemas import (
     AlbumOut, ArtistOut, CatalogOut, PickOut, PlaylistIn, PlaylistOut, PlaylistSummary, ProgressOut,
-    EnabledIn, RotationOut, RuleIn, RuleOut, SelectionOut, TrackOut,
+    EnabledIn, PlanIn, RotationOut, RuleIn, RuleOut, SelectionOut, TrackOut,
 )
 from ..links import playlist_scope
 
@@ -281,7 +281,33 @@ async def rotate_playlist(
     playlist: Playlist = Depends(get_playlist),
     session: Session = Depends(get_session),
 ):
-    plan = await rotate(session, playlist, dry_run)
+    return rotation_out(await rotate(session, playlist, dry_run), dry_run)
+
+
+@router.post("/{playlist_id}/rotate/planned", response_model=RotationOut)
+async def rotate_planned(
+    data: PlanIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)
+):
+    return rotation_out(await rotate(session, playlist, False, planned=planned_tracks(data)), False)
+
+
+@router.put("/{playlist_id}/plan", status_code=204)
+def save_plan(data: PlanIn, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
+    playlist.planned_tracks = planned_tracks(data)
+    session.commit()
+
+
+@router.delete("/{playlist_id}/plan", status_code=204)
+def cancel_plan(playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
+    playlist.planned_tracks = None
+    session.commit()
+
+
+def planned_tracks(data: PlanIn) -> list[list[str]]:
+    return [[track.track_id, track.source] for track in data.tracks]
+
+
+def rotation_out(plan: RotationPlan, dry_run: bool) -> RotationOut:
     names = {selection.artist.id: selection.artist.name for selection in plan.selections}
     return RotationOut(
         dry_run=dry_run,

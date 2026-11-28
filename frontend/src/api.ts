@@ -1,5 +1,5 @@
 import type {
-  AuthStatus, Catalog, History, ImportConflict, Playlist, PlaylistInput, PlaylistSummary, Progress,
+  AuthStatus, Catalog, History, ImportConflict, Pick, Playlist, PlaylistInput, PlaylistSummary, Progress,
   Rotation, RotationTrack, Rule, RuleKind, Settings,
 } from "./types";
 
@@ -14,6 +14,10 @@ type ErrorDetail = string | { loc: (string | number)[]; msg: string }[] | undefi
 function describe(detail: ErrorDetail): string | undefined {
   if (Array.isArray(detail)) return detail.map((d) => `${d.loc.at(-1)}: ${d.msg}`).join(", ");
   return detail;
+}
+
+function plannedTracks(order: Pick[]) {
+  return { tracks: order.map(({ track_id, source }) => ({ track_id, source })) };
 }
 
 export class ApiError extends Error {
@@ -74,4 +78,8 @@ export const api = {
   rewind: (id: number, rotationId: number) => request<void>(`/playlists/${id}/history/${rotationId}/rewind`, "POST"),
   rotationTracks: (id: number, rotationId: number) => request<RotationTrack[]>(`/playlists/${id}/history/${rotationId}`),
   rotate: (id: number, dryRun: boolean) => request<Rotation>(`/playlists/${id}/rotate?dry_run=${dryRun}`, "POST"),
+  rotatePlanned: (id: number, order: Pick[]) =>
+    request<Rotation>(`/playlists/${id}/rotate/planned`, "POST", plannedTracks(order)),
+  savePlan: (id: number, order: Pick[]) => request<void>(`/playlists/${id}/plan`, "PUT", plannedTracks(order)),
+  cancelPlan: (id: number) => request<void>(`/playlists/${id}/plan`, "DELETE"),
 };

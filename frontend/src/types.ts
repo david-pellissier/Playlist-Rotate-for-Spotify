@@ -43,6 +43,7 @@ export interface PlaylistInput {
 export interface Playlist extends PlaylistInput {
   id: number;
   artist_count: number;
+  planned_count: number;
   spotify_playlist_id: string | null;
   last_rotated_at: string | null;
   next_rotation_at: string;
