@@ -1506,6 +1506,12 @@ tbody tr.history-detail:hover td {
   margin-top: 2px;
 }
 
+.history-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 0 4px;
+}
+
 /* Schedule */
 
 .segmented {

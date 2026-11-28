@@ -148,10 +148,12 @@ export interface AuthStatus {
   authorize_url: string | null;
 }
 
+export type RotationTrigger = "manual" | "scheduled" | "rewind";
+
 export interface RotationSummary {
   id: number;
   rotated_at: string;
-  trigger: "manual" | "scheduled";
+  trigger: RotationTrigger;
   error: string | null;
   track_count: number;
   new_releases: number;

@@ -193,6 +193,42 @@ async def rotate(session: Session, playlist: Playlist, dry_run: bool, trigger: s
             return await _rotate(session, playlist, dry_run, trigger, progress)
 
 
+async def rewind(session: Session, playlist: Playlist, rotation: Rotation) -> None:
+    if rotation.error or not rotation.tracks:
+        raise RotationError("This rotation has no songs to put back")
+    with track(playlist.id) as progress:
+        async with rotation_lock:
+            progress.start("Updating the Spotify playlist")
+            if not playlist.spotify_playlist_id:
+                playlist.spotify_playlist_id = await spotify.resolve_playlist(playlist.spotify_target)
+            uris = [item.track.uri for item in rotation.tracks]
+            await spotify.replace_playlist_items(playlist.spotify_playlist_id, uris)
+            mark_current(session, playlist, [item.track_id for item in rotation.tracks])
+            session.add(Rotation(
+                playlist_id=playlist.id,
+                rotated_at=utcnow(),
+                trigger="rewind",
+                tracks=[
+                    RotationTrack(position=item.position, track_id=item.track_id, source=item.source)
+                    for item in rotation.tracks
+                ],
+            ))
+            session.commit()
+            log.info("Rewound %s to the rotation of %s", playlist.name, rotation.rotated_at)
+
+
+def mark_current(session: Session, playlist: Playlist, track_ids: list[str]) -> None:
+    in_playlist = PlaylistTrack.playlist_id == playlist.id
+    restored = PlaylistTrack.track_id.in_(track_ids)
+    session.execute(update(PlaylistTrack).where(in_playlist).values(current=False))
+    session.execute(update(PlaylistTrack).where(in_playlist, restored).values(current=True))
+    known = set(session.scalars(select(PlaylistTrack.track_id).where(in_playlist, restored)))
+    session.add_all(
+        PlaylistTrack(playlist_id=playlist.id, track_id=track_id, current=True)
+        for track_id in dict.fromkeys(track_ids) if track_id not in known
+    )
+
+
 async def _rotate(
     session: Session, playlist: Playlist, dry_run: bool, trigger: str, progress: Progress
 ) -> RotationPlan:

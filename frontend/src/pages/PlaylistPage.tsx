@@ -110,7 +110,9 @@ export default function PlaylistPage() {
       </div>
 
       {tab === "songs" && <CatalogView playlistId={id} albumsOnly={playlist.albums_only} version={catalogVersion} />}
-      {tab === "history" && <HistoryView playlistId={id} version={catalogVersion} />}
+      {tab === "history" && (
+        <HistoryView playlistId={id} version={catalogVersion} onRewound={() => setCatalogVersion((v) => v + 1)} />
+      )}
       {tab === "rotation" && (rotation
         ? <RotationView rotation={rotation} />
         : (

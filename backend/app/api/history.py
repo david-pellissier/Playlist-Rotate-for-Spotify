@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session, selectinload
 from ..db import get_session
 from ..catalog import song_artist_id
 from ..models import Album, Artist, Playlist, Rotation, RotationTrack, Track
+from ..rotation import rewind
 from ..schemas import HistoryOut, RotationSummary, RotationTrackOut
 from .playlists import get_playlist
 
@@ -58,6 +59,16 @@ def read_history(
 def clear_history(playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)):
     session.execute(delete(Rotation).where(Rotation.playlist_id == playlist.id))
     session.commit()
+
+
+@router.post("/{playlist_id}/history/{rotation_id}/rewind", status_code=204)
+async def rewind_rotation(
+    rotation_id: int, playlist: Playlist = Depends(get_playlist), session: Session = Depends(get_session)
+):
+    rotation = session.scalar(select(Rotation).where(Rotation.id == rotation_id, Rotation.playlist_id == playlist.id))
+    if rotation is None:
+        raise HTTPException(404, "Rotation not found")
+    await rewind(session, playlist, rotation)
 
 
 @router.get("/{playlist_id}/history/{rotation_id}", response_model=list[RotationTrackOut])

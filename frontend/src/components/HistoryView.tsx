@@ -2,13 +2,20 @@ import { useState } from "react";
 import { api } from "../api";
 import { formatDate, formatDuration } from "../format";
 import { useAction, useLoader } from "../hooks";
-import type { RotationSummary } from "../types";
+import type { RotationSummary, RotationTrigger } from "../types";
 
-export default function HistoryView({ playlistId, version }: { playlistId: number; version: number }) {
+const TRIGGERS: Record<RotationTrigger, string> = { scheduled: "Scheduled", manual: "Manual", rewind: "Rewind" };
+
+export default function HistoryView({ playlistId, version, onRewound }: {
+  playlistId: number;
+  version: number;
+  onRewound: () => void;
+}) {
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState<number>();
   const { data: history, error, reload } = useLoader(() => api.history(playlistId, page), [playlistId, page, version]);
   const clear = useAction();
+  const rewind = useAction();
 
   async function clearHistory() {
     if (!confirm("Delete the whole rotation history of this playlist? Cooldowns and play counts are kept.")) return;
@@ -16,6 +23,16 @@ export default function HistoryView({ playlistId, version }: { playlistId: numbe
     setPage(1);
     setOpenId(undefined);
     reload();
+  }
+
+  async function rewindTo(rotation: RotationSummary) {
+    const question = `Put the ${rotation.track_count} songs of ${formatDate(rotation.rotated_at)} back in the Spotify playlist?`;
+    if (!confirm(`${question} Play counts and cooldowns don't change.`)) return;
+    if (await rewind.run(() => api.rewind(playlistId, rotation.id).then(() => true))) {
+      setPage(1);
+      setOpenId(undefined);
+      onRewound();
+    }
   }
 
   if (error) return <p className="error">{error}</p>;
@@ -33,9 +50,9 @@ export default function HistoryView({ playlistId, version }: { playlistId: numbe
     <div className="stack">
       <div className="pager">
         <span className="muted">{history.total} {history.total === 1 ? "rotation" : "rotations"}</span>
-        <button className="small danger" disabled={clear.busy} onClick={clearHistory}>Clear history</button>
+        <button className="small danger" disabled={clear.busy || rewind.busy} onClick={clearHistory}>Clear history</button>
       </div>
-      {clear.error && <p className="error">{clear.error}</p>}
+      {(clear.error || rewind.error) && <p className="error">{clear.error ?? rewind.error}</p>}
       <div className="table-wrap">
         <table>
           <thead>
@@ -55,7 +72,9 @@ export default function HistoryView({ playlistId, version }: { playlistId: numbe
                 playlistId={playlistId}
                 rotation={rotation}
                 open={openId === rotation.id}
+                busy={rewind.busy}
                 onToggle={() => setOpenId(openId === rotation.id ? undefined : rotation.id)}
+                onRewind={() => rewindTo(rotation)}
               />
             ))}
           </tbody>
@@ -75,13 +94,15 @@ export default function HistoryView({ playlistId, version }: { playlistId: numbe
   );
 }
 
-function HistoryRow({ playlistId, rotation, open, onToggle }: {
+function HistoryRow({ playlistId, rotation, open, busy, onToggle, onRewind }: {
   playlistId: number;
   rotation: RotationSummary;
   open: boolean;
+  busy: boolean;
   onToggle: () => void;
+  onRewind: () => void;
 }) {
-  const trigger = rotation.trigger === "scheduled" ? "Scheduled" : "Manual";
+  const trigger = TRIGGERS[rotation.trigger];
   return (
     <>
       <tr>
@@ -113,7 +134,12 @@ function HistoryRow({ playlistId, rotation, open, onToggle }: {
       )}
       {open && (
         <tr className="history-detail">
-          <td colSpan={6}><RotationTracks playlistId={playlistId} rotationId={rotation.id} /></td>
+          <td colSpan={6}>
+            <RotationTracks playlistId={playlistId} rotationId={rotation.id} />
+            <div className="history-actions">
+              <button className="small" disabled={busy} onClick={onRewind}>Rewind to these songs</button>
+            </div>
+          </td>
         </tr>
       )}
     </>

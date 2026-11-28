@@ -192,7 +192,7 @@ class AuthStatus(BaseModel):
 class RotationSummary(BaseModel):
     id: int
     rotated_at: UtcDatetime
-    trigger: Literal["manual", "scheduled"]
+    trigger: Literal["manual", "scheduled", "rewind"]
     error: str | None
     track_count: int
     new_releases: int

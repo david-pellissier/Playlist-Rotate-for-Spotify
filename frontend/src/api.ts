@@ -71,6 +71,7 @@ export const api = {
   progress: (id: number) => request<Progress | null>(`/playlists/${id}/progress`),
   history: (id: number, page: number) => request<History>(`/playlists/${id}/history?page=${page}`),
   clearHistory: (id: number) => request<void>(`/playlists/${id}/history`, "DELETE"),
+  rewind: (id: number, rotationId: number) => request<void>(`/playlists/${id}/history/${rotationId}/rewind`, "POST"),
   rotationTracks: (id: number, rotationId: number) => request<RotationTrack[]>(`/playlists/${id}/history/${rotationId}`),
   rotate: (id: number, dryRun: boolean) => request<Rotation>(`/playlists/${id}/rotate?dry_run=${dryRun}`, "POST"),
 };
